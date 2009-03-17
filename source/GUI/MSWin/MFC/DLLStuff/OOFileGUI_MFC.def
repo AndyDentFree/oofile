@@ -1,0 +1,7 @@
+; OOFileGUI_MFC.def : Declares the module parameters for the DLL.
+
+LIBRARY      "OOFMFC.DLL"
+DESCRIPTION  'OOFILEGUI_MFC Windows Dynamic Link Library'
+
+EXPORTS
+    ; Explicit exports can go here
