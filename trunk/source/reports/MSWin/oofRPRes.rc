@@ -1,0 +1,100 @@
+//
+// oofRes.rc - common resources for MFC based ooFile applications
+//
+
+#include "oofRPRes.h"
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDR_PREVIEWFRAME ACCELERATORS PRELOAD MOVEABLE PURE
+BEGIN
+    "P",            ID_FILE_PRINT,          VIRTKEY, CONTROL
+    "C",            ID_EDIT_COPY,           VIRTKEY, CONTROL
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Bitmap
+//
+#ifdef OOF_BW_CHECKBOX
+IDR_PREVIEW_TOOLBAR     BITMAP  DISCARDABLE     "res\\MToolBa2.bmp"
+#else
+IDR_PREVIEW_TOOLBAR     BITMAP  DISCARDABLE     "res\\MToolBar.bmp"
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Toolbar
+//
+
+IDR_PREVIEW_TOOLBAR TOOLBAR DISCARDABLE  41, 22
+BEGIN
+    BUTTON      ID_REPORT_FIRST
+    BUTTON      ID_REPORT_PREV
+    BUTTON      ID_REPORT_NEXT
+    BUTTON      ID_REPORT_LAST
+    SEPARATOR
+#ifdef OOF_BW_CHECKBOX
+    SEPARATOR
+#else
+	BUTTON		ID_REPORT_BW
+#endif
+    BUTTON      ID_REPORT_PRINT
+    SEPARATOR
+    BUTTON      ID_REPORT_SAVEAS
+    SEPARATOR
+//    BUTTON      ID_REPORT_ZOOM
+//    SEPARATOR
+    BUTTON      ID_REPORT_CLOSE
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_REPORT_FIRST         "Move to first page\nFirst Page"
+    ID_REPORT_PREV          "Move to previous page\nPrevious Page"
+    ID_REPORT_NEXT          "Move to next page\nNext Page"
+    ID_REPORT_LAST          "Move to last page\nLast Page"
+    ID_REPORT_CLOSE         "Close the report window\nClose"
+    ID_REPORT_PRINT         "Print Report\nPrint"
+    ID_REPORT_SAVEAS        "Save the report to disk\nSave as"
+    ID_REPORT_BW            "Switch to black and white printing\nBlack and white mode"
+    ID_REPORT_ZOOM          "Display the zoom dialog\nZoom"
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_OOF_ZOOMDLG DIALOG DISCARDABLE  0, 0, 145, 58
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Zoom To"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,17,37,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,78,37,50,14
+    LTEXT           "Magnification:",IDC_STATIC,7,16,45,8
+    COMBOBOX        IDC_OOF_COMBO_ZOOM,57,14,60,113,CBS_DROPDOWN |
+                    WS_VSCROLL | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC,122,16,8,8
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_PREVIEWFRAME MENU DISCARDABLE 
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&Print...\tCtrl+P",           ID_FILE_PRINT
+        MENUITEM "Pa&ge Setup...",              ID_FILE_PAGE_SETUP
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       ID_APP_EXIT
+    END
+END
