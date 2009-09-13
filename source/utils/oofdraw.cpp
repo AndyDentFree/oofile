@@ -931,7 +931,7 @@ oofTextSizer::CalculateWrapping(
 						nextWordStart = truncAtChar+1;  // can assume at least one whitespace char exists
 					measureFrom += nextWordStart;  // saves time skipping whitespace later
 					StoreLineLength(mMeasureArray[truncAtChar] );
-					charsLeftInString  -= truncAtChar+1;
+					charsLeftInString  -= nextWordStart;
 				}  // inWillTruncWords so had to find word boundary
 				SkipWhiteForward(inValue, measureFrom, charsLeftInString); // skip leading white space before next line
 			}
