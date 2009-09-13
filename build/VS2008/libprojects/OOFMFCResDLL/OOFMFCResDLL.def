@@ -1,0 +1,6 @@
+; OOFMFCResDLL.def : Declares the module parameters for the DLL.
+
+LIBRARY      "OOFMFCRe"
+
+EXPORTS
+    ; Explicit exports can go here

@@ -2,6 +2,11 @@
 Microsoft Visual Studio Solution File, Format Version 10.00
 # Visual Studio 2008
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SampleReports", "SampleReports.vcproj", "{0A3BEA6B-B0F4-4638-9224-230D2EB095F5}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E4D46564-5516-40BF-B6F1-FE11F071E0CE} = {E4D46564-5516-40BF-B6F1-FE11F071E0CE}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OOFMFCRe", "..\libprojects\OOFMFCResDLL\OOFMFCResDLL.vcproj", "{E4D46564-5516-40BF-B6F1-FE11F071E0CE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,6 +18,10 @@ Global
 		{0A3BEA6B-B0F4-4638-9224-230D2EB095F5}.Debug|Win32.Build.0 = Debug|Win32
 		{0A3BEA6B-B0F4-4638-9224-230D2EB095F5}.Release|Win32.ActiveCfg = Release|Win32
 		{0A3BEA6B-B0F4-4638-9224-230D2EB095F5}.Release|Win32.Build.0 = Release|Win32
+		{E4D46564-5516-40BF-B6F1-FE11F071E0CE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E4D46564-5516-40BF-B6F1-FE11F071E0CE}.Debug|Win32.Build.0 = Debug|Win32
+		{E4D46564-5516-40BF-B6F1-FE11F071E0CE}.Release|Win32.ActiveCfg = Release|Win32
+		{E4D46564-5516-40BF-B6F1-FE11F071E0CE}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -16,7 +16,7 @@
 	#include "oofrepeditx.h"
 #endif
 
-#include "oofrepedit.cpp"  // include cpp file as it lacks stdafx.h at top
+#include "../../oofrepedit.cpp"  // include cpp file as it lacks stdafx.h at top
 // and because of MFC links can't be built into report library
 
 // -------------------------------------------------------

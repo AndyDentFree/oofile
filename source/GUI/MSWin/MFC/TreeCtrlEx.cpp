@@ -42,9 +42,15 @@ IMPLEMENT_DYNAMIC(CTreeCtrlEx, CTreeCtrl)
 
 BOOL CTreeCtrlEx::Create(DWORD dwStyle, DWORD dwExStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
 {
-	return CreateEx( dwExStyle, WC_TREEVIEW, NULL, dwStyle,
-		rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top, 
-		pParentWnd->GetSafeHwnd(), (HMENU)nID );
+    #if _MFC_VER >= 0x0700
+	    return CreateEx( dwExStyle, dwStyle,
+		    rect, 
+		    pParentWnd, nID );
+    #else
+	    return CreateEx( dwExStyle, WC_TREEVIEW, NULL, dwStyle,
+		    rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top, 
+		    pParentWnd->GetSafeHwnd(), (HMENU)nID );
+    #endif
 }
 
 /////////////////////////////////////////////////////////////////////////////
