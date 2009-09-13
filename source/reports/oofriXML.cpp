@@ -2047,7 +2047,7 @@ oofCSS2ReportSettings::Hash(const char* theStr)
 const char* 
 oofRepPromiseCompleter::findStringForID(const oofString& theID, const char* inString)
 {
-	char* result;
+	const char* result;
 	oofString searchPattern ="#"; // avoids  id's emmbedded in css like rules 
 	
 	if(*theID != '#')
