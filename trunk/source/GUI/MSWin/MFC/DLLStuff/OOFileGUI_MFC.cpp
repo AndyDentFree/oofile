@@ -1,7 +1,7 @@
 // OOFileGUI_MFC.cpp : Defines the initialization routines for the DLL.
 //
 
-#include "oofpch_m.h"  // for precompilation of MFC GUI files
+//#include "oofpch_m.h"  // for precompilation of MFC GUI files
 
 #include <afxdllx.h>
 
