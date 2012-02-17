@@ -10,9 +10,9 @@ directory is covered by a file in a parent directory.
 -----
 
 About 'Sample Reports'
-(last mod 2002/02/07)
+(last mod 2012/02/17)
 
-This project contains targets to build an OOFILE sample showing most reports.
+This project contains targets to build an OOFILE sample showing most reports, using an MFC GUI.
 
 It was back-ported from the SampleReportsStandalone.dsw project converted to Visual Studio 2008.
 
