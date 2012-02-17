@@ -465,7 +465,7 @@ dbConnect::WriteOOFSchemaFile()
 	gotoDatabaseDir();
 	oofString schemaFileName = MakeSchemaFileName();
 	ofstream schemaFile;
-	schemaFile.open(schemaFileName, ios::out);	
+	schemaFile.open(schemaFileName.chars(), ios::out);	
 	schemaFile << "oofschemaVer1.0";
 	describe(schemaFile);
 
