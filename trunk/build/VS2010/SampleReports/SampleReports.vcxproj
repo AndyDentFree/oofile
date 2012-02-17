@@ -1,0 +1,423 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{0A3BEA6B-B0F4-4638-9224-230D2EB095F5}</ProjectGuid>
+    <RootNamespace>SampleReports</RootNamespace>
+    <Keyword>MFCProj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseOfMfc>Dynamic</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseOfMfc>Dynamic</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.CPP.UpgradeFromVC60.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.CPP.UpgradeFromVC60.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.40219.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.\Debug\</IntDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.\Release\</IntDir>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Midl>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TargetEnvironment>Win32</TargetEnvironment>
+      <TypeLibraryName>.\Debug/SampleReports.tlb</TypeLibraryName>
+      <HeaderFileName>
+      </HeaderFileName>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>.\source;..\..\..\expatpp\include;..\..\..\include\core;..\..\..\include\GUI;..\..\..\include\reports;..\..\..\include\graphs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;OOFMFC_STATIC;_AFX_NO_DAO_SUPPORT;_Windows;_WIN32;OOF_BW_CHECKBOX;OOF_READ_REPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeaderOutputFile>.\Debug/SampleReports.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\Debug/</AssemblerListingLocation>
+      <ObjectFileName>.\Debug/</ObjectFileName>
+      <ProgramDataBaseFileName>.\Debug/</ProgramDataBaseFileName>
+      <BrowseInformation>true</BrowseInformation>
+      <WarningLevel>Level3</WarningLevel>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Culture>0x0c09</Culture>
+      <AdditionalIncludeDirectories>..\..\..\source\reports\MSWin\;.;.\source;.\source\res;..\..\..\include\reports;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Link>
+      <OutputFile>.\Debug/SampleReports.exe</OutputFile>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>.\Debug/SampleReports.pdb</ProgramDatabaseFile>
+      <SubSystem>Windows</SubSystem>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+    <Bscmake>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <OutputFile>.\Debug/SampleReports.bsc</OutputFile>
+    </Bscmake>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Midl>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TargetEnvironment>Win32</TargetEnvironment>
+      <TypeLibraryName>.\Release/SampleReports.tlb</TypeLibraryName>
+      <HeaderFileName>
+      </HeaderFileName>
+    </Midl>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <AdditionalIncludeDirectories>.\source;.\localcopies\oofile;.\localcopies\expatpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;OOFMFC_STATIC;_AFX_NO_DAO_SUPPORT;_Windows;_WIN32;OOF_BW_CHECKBOX;OOF_READ_REPORTS;OOF_USE_ANSI_STREAMS=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StringPooling>true</StringPooling>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeaderOutputFile>.\Release/SampleReports.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\Release/</AssemblerListingLocation>
+      <ObjectFileName>.\Release/</ObjectFileName>
+      <ProgramDataBaseFileName>.\Release/</ProgramDataBaseFileName>
+      <WarningLevel>Level3</WarningLevel>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Culture>0x0c09</Culture>
+      <AdditionalIncludeDirectories>.;.\source;.\localcopies\oofile;.\localcopies\expatpp;.\source\res;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Link>
+      <OutputFile>.\Release/SampleReports.exe</OutputFile>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <ProgramDatabaseFile>.\Release/SampleReports.pdb</ProgramDatabaseFile>
+      <SubSystem>Windows</SubSystem>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+    <Bscmake>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <OutputFile>.\Release/SampleReports.bsc</OutputFile>
+    </Bscmake>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="source\CSampleBase.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\CSampleDlg.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\CSampleRepEdit.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\database.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\MainFrm.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\Sample Reports.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\Sample ReportsDoc.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\Sample ReportsView.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="source\StdAfx.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oof1.cpp" />
+    <ClCompile Include="..\..\..\source\core\oof2.cpp" />
+    <ClCompile Include="..\..\..\source\core\oof3.cpp" />
+    <ClCompile Include="..\..\..\source\core\oof4.cpp" />
+    <ClCompile Include="..\..\..\source\core\oof5.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadCSV.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadHTM.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadorn.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadRTF.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadTSV.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadTxt.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadWin.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofadXML.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofarray.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofClrbl.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofcolor.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofdraw.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofDStyl.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofexcep.cpp" />
+    <ClCompile Include="..\..\..\source\core\ooffiles.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofGeos.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofGrDta.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofGrphs.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\oofgui.cpp" />
+    <ClCompile Include="..\..\..\source\core\ooflist.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofmask.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\Oofmfc.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfcct.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfchr.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfcic.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\Oofmfclk.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfcpd.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\Oofmfcyn.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofmsg.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofpch_g.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofpch_m.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofPlBit.cpp" />
+    <ClCompile Include="..\..\..\source\reports\MSWin\MFC\oofPrnWn.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofquery.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofram.cpp" />
+    <ClCompile Include="..\..\..\source\core\ooframp.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofrec1.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofrec2.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofrec3.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofrec4.cpp" />
+    <ClCompile Include="..\..\..\source\utils\oofRect.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofrel.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrep1.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrep2.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrep3.cpp" />
+    <ClCompile Include="..\..\..\source\reports\MSWin\MFC\oofrepeditWin.cpp" />
+    <ClCompile Include="..\..\..\source\reports\MSWin\MFC\oofRepMFC.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofriXML.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrpCSV.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrpHTM.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrpRTF.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrpTSV.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrptxt.cpp" />
+    <ClCompile Include="..\..\..\source\reports\MSWin\oofrpWin.cpp" />
+    <ClCompile Include="..\..\..\source\reports\oofrpXML.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofschema.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofsize.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofSrSet.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofSting.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofstr.cpp" />
+    <ClCompile Include="..\..\..\source\graphs\oofTrMgr.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofview.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofwords.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofxml.cpp" />
+    <ClCompile Include="..\..\..\source\core\oofxmldb.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\oofync.cpp" />
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\TreeCtrlEx.cpp" />
+    <ClCompile Include="..\..\..\expatpp\source\expatpp.cpp" />
+    <ClCompile Include="..\..\..\expatpp\source\xmlparse.c" />
+    <ClCompile Include="..\..\..\expatpp\source\xmlrole.c" />
+    <ClCompile Include="..\..\..\expatpp\source\xmltok.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source\CSampleBase.h" />
+    <ClInclude Include="source\csampledlg.h" />
+    <ClInclude Include="source\CSampleRepEdit.h" />
+    <ClInclude Include="source\database.h" />
+    <ClInclude Include="source\MainFrm.h" />
+    <ClInclude Include="source\resource.h" />
+    <ClInclude Include="source\Sample Reports.h" />
+    <ClInclude Include="source\Sample ReportsDoc.h" />
+    <ClInclude Include="source\Sample ReportsView.h" />
+    <ClInclude Include="source\StdAfx.h" />
+    <ClInclude Include="..\..\..\include\GUI\CWndRedir.h" />
+    <ClInclude Include="..\..\..\include\core\oof0.h" />
+    <ClInclude Include="..\..\..\include\core\oof1.h" />
+    <ClInclude Include="..\..\..\include\core\oof2.h" />
+    <ClInclude Include="..\..\..\include\core\oof3.h" />
+    <ClInclude Include="..\..\..\include\core\oof4.h" />
+    <ClInclude Include="..\..\..\include\core\oofadCSV.h" />
+    <ClInclude Include="..\..\..\include\core\oofadHTM.h" />
+    <ClInclude Include="..\..\..\include\core\oofadMac.h" />
+    <ClInclude Include="..\..\..\include\core\oofadorn.h" />
+    <ClInclude Include="..\..\..\include\core\oofadRTF.h" />
+    <ClInclude Include="..\..\..\include\core\oofadTSV.h" />
+    <ClInclude Include="..\..\..\include\core\oofadTxt.h" />
+    <ClInclude Include="..\..\..\include\core\oofadWin.h" />
+    <ClInclude Include="..\..\..\include\core\oofadXML.h" />
+    <ClInclude Include="..\..\..\include\core\oofarray.h" />
+    <ClInclude Include="..\..\..\include\core\oofbool.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofClrbl.h" />
+    <ClInclude Include="..\..\..\include\GUI\oofcmds.h" />
+    <ClInclude Include="..\..\..\include\core\oofcolor.h" />
+    <ClInclude Include="..\..\..\include\core\oofDebugNew.h" />
+    <ClInclude Include="..\..\..\include\core\oofDebugVC.h" />
+    <ClInclude Include="..\..\..\include\core\oofdraw.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofDStyl.h" />
+    <ClInclude Include="..\..\..\include\core\oofexcep.h" />
+    <ClInclude Include="..\..\..\include\core\ooffiles.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofGeos.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofGrDta.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofGrMfc.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofGrphs.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofGrWin.h" />
+    <ClInclude Include="..\..\..\include\GUI\oofgui.h" />
+    <ClInclude Include="..\..\..\include\core\oofile.h" />
+    <ClInclude Include="..\..\..\include\core\oofios.h" />
+    <ClInclude Include="..\..\..\include\core\ooflist.h" />
+    <ClInclude Include="..\..\..\include\reports\oofmac.h" />
+    <ClInclude Include="..\..\..\include\core\oofmacro.h" />
+    <ClInclude Include="..\..\..\include\core\oofmask.h" />
+    <ClInclude Include="..\..\..\include\GUI\Oofmfc.h" />
+    <ClInclude Include="..\..\..\include\GUI\oofmfcct.h" />
+    <ClInclude Include="..\..\..\include\GUI\oofmfchr.h" />
+    <ClInclude Include="..\..\..\include\GUI\oofmfcic.h" />
+    <ClInclude Include="..\..\..\include\GUI\oofmfcpd.h" />
+    <ClInclude Include="..\..\..\include\GUI\Oofmfcx.h" />
+    <ClInclude Include="..\..\..\include\core\oofmsg.h" />
+    <ClInclude Include="..\..\..\include\core\oofmswin.h" />
+    <ClInclude Include="..\..\..\include\core\oofoptn.hpp" />
+    <ClInclude Include="..\..\..\include\core\oofpch_c.h" />
+    <ClInclude Include="..\..\..\include\reports\oofpch_r.h" />
+    <ClInclude Include="..\..\..\include\core\oofplat.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofPlBit.h" />
+    <ClInclude Include="..\..\..\include\reports\oofPrnWn.h" />
+    <ClInclude Include="..\..\..\include\core\oofquery.h" />
+    <ClInclude Include="..\..\..\include\core\oofram.h" />
+    <ClInclude Include="..\..\..\include\core\ooframp.h" />
+    <ClInclude Include="..\..\..\include\core\ooframpx.h" />
+    <ClInclude Include="..\..\..\include\core\ooframx.h" />
+    <ClInclude Include="..\..\..\include\core\oofrecs.h" />
+    <ClInclude Include="..\..\..\include\core\oofRect.h" />
+    <ClInclude Include="..\..\..\include\core\oofrel.h" />
+    <ClInclude Include="..\..\..\include\core\oofrelx.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrep.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrepedit.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrepeditor.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrepeditWin.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrepeditx.h" />
+    <ClInclude Include="..\..\..\include\reports\oofRepMFC.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrepprint.h" />
+    <ClInclude Include="..\..\..\include\reports\oofreprn.h" />
+    <ClInclude Include="..\..\..\include\reports\oofriXML.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrpCSV.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrpHTM.h" />
+    <ClInclude Include="..\..\..\include\reports\oofRPRes.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrpRTF.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrpTSV.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrptxt.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrpWin.h" />
+    <ClInclude Include="..\..\..\include\reports\oofrpXML.h" />
+    <ClInclude Include="..\..\..\include\core\oofschema.h" />
+    <ClInclude Include="..\..\..\include\core\oofsize.h" />
+    <ClInclude Include="..\..\..\include\core\oofSmartheap.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofSrSet.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofSting.h" />
+    <ClInclude Include="..\..\..\include\core\oofstr.h" />
+    <ClInclude Include="..\..\..\include\core\ooftest.h" />
+    <ClInclude Include="..\..\..\include\graphs\oofTrMgr.h" />
+    <ClInclude Include="..\..\..\include\core\oofview.h" />
+    <ClInclude Include="..\..\..\include\core\oofwords.h" />
+    <ClInclude Include="..\..\..\include\core\oofxml.h" />
+    <ClInclude Include="..\..\..\include\core\oofxmldb.h" />
+    <ClInclude Include="..\..\..\include\GUI\oofync.h" />
+    <ClInclude Include="..\..\..\include\graphs\PLOTPANE.H" />
+    <ClInclude Include="..\..\..\include\GUI\stSetCursor.h" />
+    <ClInclude Include="..\..\..\include\GUI\TreeCtrlEx.h" />
+    <ClInclude Include="..\..\..\include\core\WinTypes.h" />
+    <ClInclude Include="..\..\..\expatpp\include\ascii.h" />
+    <ClInclude Include="..\..\..\expatpp\include\asciitab.h" />
+    <ClInclude Include="..\..\..\expatpp\include\expatpp.h" />
+    <ClInclude Include="..\..\..\expatpp\include\iasciitab.h" />
+    <ClInclude Include="..\..\..\expatpp\include\latin1tab.h" />
+    <ClInclude Include="..\..\..\expatpp\include\nametab.h" />
+    <ClInclude Include="..\..\..\expatpp\include\utf8tab.h" />
+    <ClInclude Include="..\..\..\expatpp\include\xmldef.h" />
+    <ClInclude Include="..\..\..\expatpp\include\xmlparse.h" />
+    <ClInclude Include="..\..\..\expatpp\include\xmlrole.h" />
+    <ClInclude Include="..\..\..\expatpp\include\xmltok.h" />
+    <ClInclude Include="..\..\..\expatpp\include\xmltok_impl.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="source\Sample Reports.rc">
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="res\SampleReports.ico" />
+    <None Include="res\SampleReports.rc2" />
+    <None Include="res\SampleReportsDoc.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\libprojects\OOFMFCResDLL\OOFMFCResDLL.vcxproj">
+      <Project>{e4d46564-5516-40bf-b6f1-fe11f071e0ce}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

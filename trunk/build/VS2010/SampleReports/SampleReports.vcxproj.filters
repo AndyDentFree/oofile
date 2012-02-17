@@ -1,0 +1,665 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{589ee0eb-45df-4842-b275-bf8325bb412a}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;rc;def;r;odl;idl;hpj;bat</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{fabd8dbf-0d8e-4eae-8082-ffb50d573997}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{c3396a52-7307-4f2e-8461-39b58f48fe88}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="OOFILE">
+      <UniqueIdentifier>{756abf26-1645-4b6f-95cb-13a5e60ad9da}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OOFILE\OOFILE headers">
+      <UniqueIdentifier>{0b5092ed-c7f3-4f30-b825-bcf2c5cb6744}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl</Extensions>
+    </Filter>
+    <Filter Include="OOFILE\OOFILE source">
+      <UniqueIdentifier>{f9c5ecb0-45a4-488a-96d2-118ad68ea161}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;rc;def;r;odl;idl;hpj;bat</Extensions>
+    </Filter>
+    <Filter Include="expatpp">
+      <UniqueIdentifier>{3a9aa91c-f3f1-4de3-9710-a55dddeae7c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="expatpp\expatpp headers">
+      <UniqueIdentifier>{e07478f7-e539-4419-9b53-c0cc7613eae9}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl</Extensions>
+    </Filter>
+    <Filter Include="expatpp\expatpp source">
+      <UniqueIdentifier>{aac3db1b-b81a-4428-bcec-8a428cd9446f}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;rc;def;r;odl;idl;hpj;bat</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source\CSampleBase.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\CSampleDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\CSampleRepEdit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\database.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\MainFrm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Sample Reports.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Sample ReportsDoc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Sample ReportsView.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\StdAfx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oof1.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oof2.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oof3.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oof4.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oof5.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadCSV.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadHTM.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadorn.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadRTF.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadTSV.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadTxt.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadWin.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofadXML.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofarray.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofClrbl.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofcolor.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofdraw.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofDStyl.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofexcep.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\ooffiles.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofGeos.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofGrDta.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofGrphs.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\oofgui.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\ooflist.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofmask.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\Oofmfc.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfcct.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfchr.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfcic.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\Oofmfclk.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofmfcpd.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\Oofmfcyn.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofmsg.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofpch_g.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\oofpch_m.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofPlBit.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\MSWin\MFC\oofPrnWn.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofquery.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofram.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\ooframp.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofrec1.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofrec2.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofrec3.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofrec4.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\utils\oofRect.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofrel.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrep1.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrep2.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrep3.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\MSWin\MFC\oofrepeditWin.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\MSWin\MFC\oofRepMFC.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofriXML.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrpCSV.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrpHTM.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrpRTF.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrpTSV.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrptxt.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\MSWin\oofrpWin.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\reports\oofrpXML.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofschema.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofsize.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofSrSet.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofSting.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofstr.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\graphs\oofTrMgr.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofview.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofwords.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofxml.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\oofxmldb.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\oofync.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\GUI\MSWin\MFC\TreeCtrlEx.cpp">
+      <Filter>OOFILE\OOFILE source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\expatpp\source\expatpp.cpp">
+      <Filter>expatpp\expatpp source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\expatpp\source\xmlparse.c">
+      <Filter>expatpp\expatpp source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\expatpp\source\xmlrole.c">
+      <Filter>expatpp\expatpp source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\expatpp\source\xmltok.c">
+      <Filter>expatpp\expatpp source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source\CSampleBase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\csampledlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\CSampleRepEdit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\database.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\MainFrm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Sample Reports.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Sample ReportsDoc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Sample ReportsView.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\StdAfx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\CWndRedir.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oof0.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oof1.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oof2.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oof3.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oof4.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadCSV.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadHTM.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadMac.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadorn.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadRTF.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadTSV.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadTxt.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadWin.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofadXML.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofarray.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofbool.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofClrbl.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\oofcmds.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofcolor.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofDebugNew.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofDebugVC.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofdraw.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofDStyl.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofexcep.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\ooffiles.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofGeos.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofGrDta.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofGrMfc.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofGrphs.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofGrWin.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\oofgui.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofile.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofios.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\ooflist.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofmac.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofmacro.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofmask.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\Oofmfc.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\oofmfcct.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\oofmfchr.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\oofmfcic.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\oofmfcpd.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\Oofmfcx.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofmsg.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofmswin.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofoptn.hpp">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofpch_c.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofpch_r.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofplat.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofPlBit.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofPrnWn.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofquery.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofram.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\ooframp.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\ooframpx.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\ooframx.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofrecs.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofRect.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofrel.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofrelx.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrep.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrepedit.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrepeditor.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrepeditWin.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrepeditx.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofRepMFC.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrepprint.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofreprn.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofriXML.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrpCSV.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrpHTM.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofRPRes.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrpRTF.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrpTSV.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrptxt.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrpWin.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\reports\oofrpXML.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofschema.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofsize.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofSmartheap.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofSrSet.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofSting.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofstr.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\ooftest.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\oofTrMgr.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofview.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofwords.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofxml.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\oofxmldb.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\oofync.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\graphs\PLOTPANE.H">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\stSetCursor.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\GUI\TreeCtrlEx.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\include\core\WinTypes.h">
+      <Filter>OOFILE\OOFILE headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\ascii.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\asciitab.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\expatpp.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\iasciitab.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\latin1tab.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\nametab.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\utf8tab.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\xmldef.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\xmlparse.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\xmlrole.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\xmltok.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\expatpp\include\xmltok_impl.h">
+      <Filter>expatpp\expatpp headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="source\Sample Reports.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="res\SampleReports.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\SampleReports.rc2">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\SampleReportsDoc.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>
