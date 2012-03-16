@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CppUnitTest.h"
+#include "../oofCore/oofCore_initialDemoForUnitTests.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -15,6 +16,15 @@ namespace CoreUnitTests
 			Assert::IsNotNull(&i);
       Assert::AreEqual(2 + 2, i);
       Assert::AreEqual(2 + 2, i, L"Optional message needs the L prefix to make a wchar literal");
+
+		}
+	
+		TEST_METHOD(TestExportedDLL)
+		{
+      Assert::AreEqual(42, fnoofCore());
+      CoofCore fred;
+      Assert::AreEqual(-997, fred.TestMethod());
+
 		}
 
 	};

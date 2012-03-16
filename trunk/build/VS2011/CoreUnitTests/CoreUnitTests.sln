@@ -3,12 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 11
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CoreUnitTests", "CoreUnitTests\CoreUnitTests.vcxproj", "{B0A6D106-85BC-8103-1DD9-3AF6099FF9DB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "oofCore", "oofCore\oofCore.vcxproj", "{0EEB7C8D-E0FF-C943-BE2E-92DA61FA1E41}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0EEB7C8D-E0FF-C943-BE2E-92DA61FA1E41}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0EEB7C8D-E0FF-C943-BE2E-92DA61FA1E41}.Debug|Win32.Build.0 = Debug|Win32
+		{0EEB7C8D-E0FF-C943-BE2E-92DA61FA1E41}.Release|Win32.ActiveCfg = Release|Win32
+		{0EEB7C8D-E0FF-C943-BE2E-92DA61FA1E41}.Release|Win32.Build.0 = Release|Win32
 		{B0A6D106-85BC-8103-1DD9-3AF6099FF9DB}.Debug|Win32.ActiveCfg = Debug|Win32
 		{B0A6D106-85BC-8103-1DD9-3AF6099FF9DB}.Debug|Win32.Build.0 = Debug|Win32
 		{B0A6D106-85BC-8103-1DD9-3AF6099FF9DB}.Release|Win32.ActiveCfg = Release|Win32
