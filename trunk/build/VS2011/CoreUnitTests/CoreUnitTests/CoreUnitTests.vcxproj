@@ -54,7 +54,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(VCInstallDir)UnitTest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\oofCore;$(VCInstallDir)UnitTest\include;$(OOFILE_ROOT)\include\core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
     </ClCompile>
@@ -71,7 +71,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(VCInstallDir)UnitTest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\oofCore;$(VCInstallDir)UnitTest\include;$(OOFILE_ROOT)\include\core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
     </ClCompile>
@@ -95,7 +95,7 @@
     <ClCompile Include="unittest1.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\oofCore\oofCore.vcxproj">
+    <ProjectReference Include="..\..\oofCore\oofCore.vcxproj">
       <Project>{0eeb7c8d-e0ff-c943-be2e-92da61fa1e41}</Project>
     </ProjectReference>
   </ItemGroup>
