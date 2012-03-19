@@ -1,0 +1,13 @@
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+MODIFYING UNIT TEST PROJECT TO GET CORE BUILT
+2012/03/19
+starting with the CoreUnitTests solution and associated projects
+- moved oofCore project up one level so it becomes a peer
+
+CoreUnitTests.sln
+- edited to redirect to "..\oofCore\oofCore.vcxproj"
+- changed General Output Directory from $(SolutionDir
+ 
+CoreUnitTests project
+- added to C/C++ includes $(OOFILE_ROOT)\include\core;$(SolutionDir)..\oofCore
+- removed and re-added the reference to the oofCore project
