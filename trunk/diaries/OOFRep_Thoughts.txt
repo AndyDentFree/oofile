@@ -1,0 +1,758 @@
+OOFRep Thoughts
+
+96/09/30
+BANDING
+To accommodate the KIDMAP reports we need to be able to have :
+- body composed of a graph and columnar area, 
+- graph recalculated (different view from cols) for every record
+- break to a new page on change of record
+
+This indicates a banding model (at least for now) within the body as well as the headings. It may be worth moving to a generalised banding model, where the governing attributes is when drawn:
+- start/end report, 
+- start/end break, 
+- start/end page, 
+- once (ie: normal body)
+
+
+STYLES
+Styles should follow the HTML/Word model.
+
+Thus, we have named styles and we can also override the current style by specifying additional attributes on text.
+
+For the HTML output, use of the predefined style names will just insert the appropriate tags (H1 etc.) ignoring any local style specifications. However overrides (eg: Bold) will generate suitable tags.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/10/11
+DISCUSSION WITH KEN
+
+I started talking about a separate rendering engine and he pulled me up short - it's too hard for now and the architecture may not be appropriate - we don't want one engine that knows how to render everything.
+
+Constraint - user should be able to specify report then run against different environments.
+
+Idea - the thing we want to isolate is various services (eg: set style) for different environments plus provide a way to trigger polymorphic dispatching in our draw code.
+
+Note that this will only work if we pass in a reference - we can't keep a base pointer and dispatch on it.
+
+This implies that the oofReportSpec::Draw will have to be repeated for each possible environment type, with near-identical code.
+
+Another approach is that we just implement a GUI draw for now, and later refine this to have separate lightweight objects handle the drawing for each type - a factory is used based on the type of environment. These drawing objects can be shared (Flyweight pattern) so one is created for each kind of object in the report.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/19
+SUMMABLE FIELDS AND VIEW FOOTERS
+Was talking to Brad about how to implement a report with summation.
+
+There are a few problems:
+- how to sum the field
+- how to align the sums under the field's columns
+
+
+From the principle of symmetry, it seems desirable to specify footers for a view, to match the headers we can now specify.
+
+If a footer could take an oofSum object, which summed a field, this would probably do. 
+
+Something like setFooter(3, new oofSum) might work. We want a factory function that creates the right kind of accumulator for the field type, so maybe a lightweight temporary factory setFooter(3, oofSum) would do the trick.
+
+In adding an oofSum to a view, it is effectively a standalone calculated field, that is calculated on each iteration through the view. The field of course adds nothing to the visible columns.
+
+This leads to a general thought on calculated fields - they should be told when iteration has started so that any accumulators can be initialised.
+
+
+	
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/06/11
+PAGE SIZES IN RTF
+
+There are a couple of issues. Firstly, the RTF calcPageWidth and calcPageHeight need to know the expected page height and width for the environment. This implies passing in these values - a calling program should be able to retrieve or define eg: if using A4 vs US Letter.
+
+Secondly, MS Word seems to hardcode the headers and footers at 0.5" from the edge of the page, by default in recent versions and always in v5 or earlier (Mac). Unless there's now an RTF code to adjust this, the only way would be to add a spacer paragraph before/after the header/footer to give the illusion of being X from the edge of the page, but actually starting 0.5" away to satisfy Word.
+
+
+	
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/07/30
+ACTIVE REPORTS
+
+Reports - solutoin to a number of issues
+- Mercator wanting to have clickable reports so they can do dril-downs
+- generation of HTML pages from OOFILE
+  - initial appealing approach is take dbView to create HTML form
+  - lacks formatting control
+  - makes sense to build upon the HTML report-writer
+  
+"Active Reports"
+- has a dbView (or several)
+- can either update data and/or respond to user actions
+- clickable - specify user actions
+- editable - allows in-cell editing, live updates
+- requires an object to specify its behaviour
+- tie into thinking about PowerPlant editable tables
+
+HTML report that was clickable would generate URL's
+
+Remember also Mercator's desire to save reports as standalone objects. This ties into an earlier idea of mine of a report-renderer that's a helper app, passing a report-type down through http from a server.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/07/30
+CODE GENERATION WITH APPMAKER
+
+AM could be used to layout a report with GUI tools, attaching dbViews etc.
+Static text and lines would become report objects, static or editable text with fields attached would become field objects, and browsers with dbViews could become view bands.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/07/30
+REPORT FORMS
+I realised whilst talking to Brad that you can currently make an OOFILE report which is basically like a form, using a view band with no content and attaching a layout band with a break every record.
+
+I need to test that you can run a view with no content and if there are any side-effects. Also the one thing missing is better layout control rather than the simple concatenation model.
+
+This led me into thinking of constructing a report directly from a PowerPlant screen. It would iterate the members of the screen, with options to ignore buttons etc. but show checkboxes, radios in some manner. Reconciling the dbEditHelper with the ID's of controls would yield field linking info.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/23
+SIMPLIFYING REPORTS
+A report window owns its report, or a report can own its window.
+
+We should be able to construct a report window from a view or table, in which case it creates a report.
+
+Similarly, a view() method of a report should create a window based on the default environment (compile-time #ifdef'd).
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/08
+REPORTS OWNING DATA
+
+How do you handle cleaning up all the related data?
+If you have a multiple-level nested report and you tell it (or by default) the top-level view band owns its own data and we have (as often in KIDMAP) related data in nested view bands.
+
+For starters we have a pyramidal explosion of the data.
+
+There are two ways to look at accumulating data. If we do it all at setup time, then we have to navigate all the data. Otherwise we can just save the data the first time we run the report.
+
+Maybe we model reports as objects like the current graphs, so the data is saved in the elements.
+
+Can we constrain this to the simple situation of Mercator or similar sites where the initial need is to retain the top level view's selection, NOT the actual database? There is potential that re-running the report will show different results in a multi-user situation.
+
+The assumption is that any other field values in the report are derived from the top-level view band or are currently correct. This is somewhat dangerous but may just be good enough for some circumstances.
+
+Later idea - we would only bother copying data if the field's table is not the table of the top view, and is not a related clone of that table.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/10/25
+ADDITIONAL INTERFACES
+oofRep and oofRepWindow should take a list of fields, creating a view on the first field's table.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/01
+SUB-REPORTS
+Take an example like KIDMAP where some reports are being printed in a loop that creates individual reports. It would be nice to offer a report nesting facility:
+- can see index page
+- prev/next report buttons
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/09
+REPORT ADORNERS
+It would be nice if the report adorners could in some way be defaulted from the fields in the database schema.
+
+The main issue would be how to combine adorners if a layout band composed of multiple fields - do we distinguish field-wise from band-wise adorners?
+
+The main problem is with the plethora of RAM tables used in KIDMAP - if people are copying data from the main schema into a local RAM table how do we transfer the default adorners?
+
+Possible models
+- definining data types which we reuse in other tables.
+- attaching the adorners so they are copied across to the RAM tables
+  (something like useAdornersFrom) 
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/15-17
+NEW APPEARANCE
+New a way to define styles in a hierarchy and rules for how a style is chosen (a Strategy object to define this policy).  eg: how do you decide which border style is used for a given view?
+
+This implies naming styles - use name matching rather than passing in object.
+
+Borders - want to be able to draw with corner and side pictures.
+- possible to have individual corners or just one we rotate
+- possible to have sets of sides or just rotate, or top/sides different
+
+Clicking
+- fundamentally triggers a command
+- HTML version comes back to CGI responder which 
+- report encodes OID which can retrieve page state
+- URL for header is OID plus Command number
+- have family of click responders, default being a resort one.
+- how sort by multiple columns?
+  - button across top of several fields
+  - button has command, maybe knows a dbSorter?
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/19
+GRAPH BANDS
+Need to become variable height bands.
+
+Should describe graph in terms of aspect ratios - Ken says (19/12) that this is too hard to do for now in the graphing engine, best done in the graphBand.
+
+Need setting for graph bands to ignore fixed heights, or maybe take the height as half the aspect ratio, and have a setting that is the average number of bars.
+
+Relative positioning of graph legends, based on similar ratios?
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/19
+SIZING AND LAYOUT CONTROL
+Can priority of size negotiations be user definable?
+
+Pass in policy object with rules (maybe a simple data-driven one as well).
+
+OOFILE should have good aesthetic defaults, eg: drop font size if wrapping too much.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/29
+NEW ADORNER FEATURES
+
+Must be settable as defaults - Prototype pattern (implies clonable).
+
+Adorners may subtract space from their parent - are marked as draw behind/on top
+of/besides.
+
+Current box features should translate into adorners.
+
+Don't forget the need to specify graph band height in a resizable manner for the
+bar graphs (mainly). For the other graphs, I guess we need feedback on the range
+of values - ultimately the graph should be able to provide this.
+
+Want to put pictures in blocks.
+
+Centering of blocks?
+
+how specify shading of individual cells/cols/rows?
+- adorner gets cell pos
+
+adorners register self with their bands if they handle multiple roles????
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/02/06
+ADORNERS AND ROLES
+It just struck me whilst thinking about attaching color erases to fields
+that there is a deep problem with lack of reflectivity in the Adorner
+(Strategy pattern). 
+
+Let's say I have a colour erase (white) attached to a field and want to
+attach a different colour to indicate a read-only field (nice idea). 
+
+At the time of attaching the new adorner, how do I know which it
+replaces? 
+
+The loose concept I've obtained is one of registry of services provided
+- we look for a service we override/replace.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/02/17
+SIMPLIFIED REPORT CONSTRUCTION SYNTAX IDEAS
+(Cameron loved em!)
+
+oofRep theRep;
+theRep 
+	<< oofTextStyle("Helvetica", bold, 14)
+	<< "This is a title, assumed just append text that it is a report heading" 
+	<< oofRepUseDefaultStyle
+	<< mData->P
+	<< oofGraph( mData->P->PS->performanceView() )
+
+New ideas
+ - default dbView for a table, so can just throw table into report.
+- Graph is anonymous, default type for table? Assume user will change type so
+  overall default for reports.
+- inline styles affect all that follow
+- report has list of bands so can just append lots of top level bands
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/13
+PLACEHOLDERS
+Thinking about future simplified report syntax, we may want to construct a
+report with things like the name of the main table (topmost view's table) in the
+header.
+
+As part of a global page header this obviously can't be a fixed string. Maybe we
+need some kind of placeholder object to represent tables or views of the future
+report.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/19
+HTML DISPLAY AND NEW ENGINE
+
+The new layout engine should have an internal layout algorithm sufficiently
+flexible to display at least basic HTML. Similarly, the click detection should
+allow for future resolution.
+
+Thought - although the overall layout may not be able to be handled by HTML, how
+much of our current layout could be recoded as HTML with effectively special
+syntax?
+
+Could our internal syntax for view bands etc. be FM Pro compatible, so HTML
+parsing later on web servers becomes almost trivial?
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/26
+RANDOM OUTPUT & GRAPHICAL EFFECTS ON REPORTS
+
+Started as a silly idea, but it kind of makes sense that in some
+circumstances you might want data randomised, within certain boundaries.
+
+For example, a teacher might have a set of 'stamp' pictures where they
+have random selections of 3 different images for each level - it is not
+strictly about random data so much as a flavouring.
+
+This would be a very sexy example!
+
+A 'rubber stamp' drawing effect would be a very cool adorner to add!
+It raises interesting questions about having a picture field that's
+essentially calculated, and seeded from a text field. (This is not
+really an adorner.)
+
+However, thinking about report adorners leads me to think about filters
+that could be applied to simple graphics to enhance them, maybe
+Quicktime dependent, or ImageGear (or similar) library based. For
+example, having a "spotlight" or Drop Shadow effect auto-applied to
+simple logos might be very nice and save users time.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/27
+THOUGHTS ON REDESIGN ENGINE
+
+It seems likely that some of the ideas for a new engine that were going
+to be part of Mercator's OutWrite project will be postponed.
+
+Something to take into account is the increasing chance of having to
+have our own lightweight xplat WP engine, at least capable of
+- formatted text
+- simple layout within fields (tabulation, indents)
+- maybe embedded pictures.
+
+We will at least need to mix fields with formatted content, mail-merge.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/16
+ABILITY TO SET GRAPH FONT SIZES
+The current graphing engine hard-codes its font sizes, in
+oofGeoText::mIdealTextSize, which is defaulted to 12 pts and overriden in
+various ctors for subclasses:
+oofGeoXTickLabel, oofGeoYTickLabel - 10pts
+oofGeoTitle - 18 pts
+
+The question to be resolved is whether the report band should override the
+font sizes set in the graph (the text style of the band is used to set the
+style and face).
+
+Even after a mechanism is added to graphs to allow setting fonts, should a 
+graph used in a report have its settings overriden?
+
+This ties into a larger question - we currently have no mechanism to detect 
+if a report or graph setting has been overriden from the default.
+
+oofRepGraphBand::finishConstruction calls oofGraph::finishConstructionWithPresets
+which eventually gets down to calling Transform on the various oofGeo's which
+is where the mIdealTextSize variable is used.
+
+Thus, we have a window of opportunity where the report band can reset the
+font sizes in the graph.
+
+If the base font size for a graph were set by graph settings, it can be overriden
+at this point.
+
+Note earlier idea that an oofGraphsettings object could be attached to a
+report to set the defaults used by graph bands.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/24
+REPORT INTERNALS AND CSS2
+The more I read of the CSS2 standard the more I a convinced that this provides
+the style and layout model toward which we should aspire. 
+
+That doesn't imply a wholesale change in how OOFRep works, at least not yet. 
+Our table rendering model is if anything a trivial but much higher level model
+than their table model.
+
+Ultimately, their display positioning, attributes and layout models encompass
+everything I've ever wanted to do with OOFRep.
+
+There are still some things (notably tables and page dimensions) lacking from CSS1
+as discussed in the book I bought. These are covered from the CSS2 spec so we 
+could implement a subset of CSS2 and satisfy all our needs.
+
+Coupled with my ideas on redesigning the engine, I wonder if we should approach
+this as CSS-style primitives with a higher-level data filling model based on 
+the view bands.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/01
+LAYOUT VS CSS2 STYLE DESCRIPTIONS AND SETTINGS
+
+A few thoughts in prep for the coding of report structures to file.
+
+We need to retrieve the current settings. Should a report only save the 
+settings it overrides or all the settings in force? It is easier with the
+latter as we don't have a mechanism to retrieve only overriden settings.
+
+David's questions about CSS matching make me think more. I think to a certain
+extent we do still have matching, but to a layout rather than the original XML
+data.
+
+ie: a layout might say there's a:
+view band
+  graph band
+  view band
+	  layout band
+
+These can be simply named view1, graph 1.1, view 1.1 etc.
+
+The CSS matching would be to these simple entities, for now.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/09
+FIXING WINDOWS SCALED RENDERING MIS-SIZES
+
+Noticed page 1104 of Programming the Win32 API has a comment about TrueType
+scaling very badly with MM_ISOTROPIC (and presumably MM_ANISOTROPIC).
+
+Possible solutions would be skipping to MM_TEXT to get the font or using
+track kerning as described on p1108.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/31
+XML PARSING AND AUTO-REPORT GENERATION FROM SCHEMAE
+
+Report-writer parsing DTD - if we uniquify table names now across the multiple reports 
+there is no reason why they can't be in one big database.
+
+In future we should be able to take plain XML and produce a deduced report layout from
+the tables. This is actually from a future ability to take a table, view or connection
+and generate an oofRep. In the case of a connection it takes a root table number which
+defaults to 0.
+
+An alternative is that all non-hidden (or non-related?) tables in the connection 
+become siblings in a bandList when we allow a bandList to be a top-level member of
+report.
+
+Auto-generation of reports. If we have all text data types we might want a quick pass
+through the data to measure the widest text. This should be more sophisticated, maybe 
+an average and std deviation. Look at the TeX books.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/24 
+FEW QUICK THOUGHTS ON PARSING REPORTS & SAVING MULTIPLE REPORTS
+
+MultiRep format
+- can XML Schema be embedded in outer tags?
+- hence sections would contain own schema
+
+need report visitor to run through structure 
+  - makeRender
+  - finishCreation
+- accumulate schema in stuff that outputs CSS etc.
+- move making renderers into environment so 
+  - can override
+  - can call again - oofRepXML::startEnvironment could
+    check the layout string size and re-make renderers
+    to regenerate
+
+need sample with true nested view bands  
+
+data writer can accumulate schema
+
+include Bruno's stuff but OutWrite won't use. That way 
+OOFILE can generate DTD or XML Schema.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/10 Mon
+SLIDE TOGETHER IDEAS
+Would be really cool if view bands allowed FM Pro-style "slide together".
+- specify an oofColSlider(oofString) to specify separator
+  - slides if lhs is one row high
+  - draws rhs at lhs actual end plus width of slider
+  - draws slider content between lhs and rhs
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/06-07
+EDITING REPORTS - EDITING INTERFACE
+
+99/09/26
+At the overall level an editable report pane needs to be managed by edit helper -
+this is how we will provide generalised databse editing.
+
+One of the things that happens is triggering reflow of the report. That might be
+wired in as separate event however.
+
+Big difference between normal EditHelper and editing report is that we have a
+single field editor in a sep dialog, not in-place editing.
+
+Assume ultimately want in-place editing and also make this usable as browsable
+editor model.
+
+We have the edit help handle issues such as next/prev record.
+
+Edit helper needs to be aware of save option not needing to confirm saves.
+
+Side note - report writer when reads file back can use autoOnExit mode for saves,
+not bufferForever.
+
+Need GUI adaptor linking to report objects providing editing interface to them,
+with concept of left/right/up/down (?)
+
+That adaptor may also be used to implement or generate the generic clicking
+behaviour. User can subclass to provide interaction. Seems silly to create too
+many different objects!
+
+Have generic interface - something which expects to talk to a field link (can we
+have a standard adaptor which handles multiple edit pane, getting current field
+changed?)
+
+Main issue with the editing is moves between fields and pseudo fields, being
+fixed value strings in report objects.
+
+The field adaptors themselves may need to present standalone OOFILE fields for
+the report object static text.
+
+Adaptor for each report object type, providing isLeft, isRight etc. status
+
+best to provide that in a single call so we can update the arrows
+
+
+More thinking about the report editor
+- tying it into the edit helper ties in nicely to the browsable editor
+- still want it to handle next record because if DB in auto-save or don't care
+mode avoid prompt
+- need user indicator they can go up or down (next page event?)
+- advancing to next record, does it imply advance to next page?
+
+
+99/09/26
+Add to edit discussion - the issue of navigation buttons. My suggested fix that
+we nav within tables separately from elements makes a lot of sense when you
+consider that user changes to report environment can affect order of report
+elements. Alternatively the factoring exposes these boundaries. If we regard
+every element thorugh adaptor interface provides 2D navigation, we should know
+when we cross a page boundary. Do we want to know that anyway? If so, do we want
+to know start and end page? Consider a note which covers 3 pages and you start
+editing, you only know roughly know the page range, not on which exact page you
+are editing.
+
+I'm not sure this makes a lot of sense - consider a note on 2 pages into which
+you insert a page and a half of text. When do you reflow the page and decide next
+element? It all gets very hard - safest to limit to just navigate within an
+element (band)?, maybe in future within a layout band as well?
+
+Cancel/Save issue.
+
+We do have Cancel/Save on reports, but it's a field-level issue and better as
+Revert/Close.
+
+Interaction mapping - map stores col widths and (separately) vertical starts (if
+appropriate).
+
+
+99/09/28 Tue
+Hooking up renderers to do the manufacture of objects for us. The env creates
+renderers using wrappers. The wrapping renderers forward to the main one most of
+the time but also on the draw calls update the map (Facade pattern?).
+
+The renderers for Mac and Win GUI are reused for printing - wrapper should only
+apply editor active (are these renderers recreated for print after preview?).
+
+99/10/04
+Report editing - how attach interaction
+- custom editable report window or
+- existing always editable (if editor attached)
+- attach interactor to existing window
+
+Interactor
+- user cursor changes (mouse within)
+- user choose if single or double-click to trigger edits
+- user choose if mode or not
+
+Interactor given map which points to other objets.
+
+We provide default interactor which is user overridable.
+Can be overriden for given report object (and class). Attaching a factory to the
+report object allows for subclass to always attach or specific report attaches.
+
+
+99/10/09
+Preview window could be aware of interactors registered with it. It will forward
+keystrokes, clicks, double-clicks and mouse movements.
+
+Editor can provide optimal processing from the map to other objects. Minimal
+coupling between report editor and preview window.
+
+
+99/10/14
+Mac report window contains pane which needs to forward clicks etc.
+Alternatively report window registers attachments with the pane.
+
+
+99/10/20
+How do I handle the report editor linking and the idea of sophisticated
+linking via the GUI adaptors. They are currently highly decoupled using an
+interface assuming passing only text.
+
+What happens when we want GUI controls to be able to convey rich data?
+
+Thinking more about this, controls themselves don't directly update rich
+data. A rich data type such as a text style is actually edited by a number
+of controls!
+
+I think this can safely be left for later. The report editor will be
+talking to an interaction object and can update its text style. Note that
+there is a behavioural flag here - some content types allow text style
+editing within the data type. Others will have a single text style for the
+whole column (view) or the entire object (eg: page no block).
+
+
+Factory pattern we've used is that a renderer is created by the environment
+calling the object. Thus a user adds a report object and chooses what
+renderers it can create.
+
+No point the envir. being the editor factory - we are attaching an editor
+to preview windows. Default can come from the settings.
+
+Can disable default.
+
+Can disable by setting to nil on given preview window.
+
+We use the same inverse factory pattern for creating the interaction objects:
+- drawable knows how to create custom interactor
+- environment knows how to create default interactors
+
+Do we need edit linkers?
+
+Alternatives:
+1) edit linker covers the gap between our editor and the report object
+
+2) object model of oofRepDrawable makes properties visible that editor
+would want to access. This is simpler and saves having to add classes.
+Loses flexibility.
+
+
+99/11/11
+Interactors mapping back to the database.
+An interactor just records the position of a drawable. A view interactor
+will have to record the data in the view.
+
+Graph bands need to suppress editing - makeRender should make a normal
+render for the parent GUI. Maybe default for bands is this approach, will
+include spaces, lines etc. Need to have default that does mapping for
+oofRepBlock.
+
+If we store the selection we're stashing something in the map which is
+going to be used to map to the edit links as well. Maybe that can be the
+same object as the interactor. Inside the map for the view band do we store
+the col widths, or refer to the original oofRepViewBand?
+
+Blocks inside layout are individually recorded - the layout gives the
+navigation context.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/20
+EDITING REPORT INTERACTIONS - NAVIGATION
+
+A report is a complex tree to navigate.
+
+Let's look at a series of nested tables. Say the top level has a break 
+to a new page every record and shows two nested tables.
+
+When editing a given table (oofRepViewBand) we primarily want to be able
+to step through the data within that table, thus skipping through many pages.
+
+However, at a given line, we may want to go "deeper" into the tree.
+
+Is it worth using a different model, such as a visible tree, to navigate this 
+dimension of report structure vs content?
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/25 ELEMENT VS CELL NAVIGATION
+Want a way to go to the next element.
+
+At any given point in the page map we know where we are with relation to a given
+page.
+
+What we want is for the page map to navigate to the next item above or below
+that's a different edit link.
+
+We initiate editing via the page map which is an effective cell map for mapping
+clicks to an edit link (with array coords).
+
+The environment has a page location. That page location can be used to say what's
+the next structural object.
+
+Page maps are a more sophisticated structure (at least behaviourally) allowing
+navigation to previous object given editlink and array coords.
+
+Use quick scan then later do sub-indexing: as we add links the secondary list
+of edit links on this page stores row numbers at which the edit link starts on
+this page.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/19 Sun
+REPORT VIEWS FROM XML
+
+The initial default parser for <table> elements assumed that OOFILE had written
+out the XML and so the only fields in a table were the ones you wanted in the report.
+
+We can now run reports against an existing database so want a way to specify a
+view other than the default of all visible fields from dbTable::makeView
+
+Alternatives:
+1) subtraction - column specifiers if they name fields act as a "skip until"
+   specifier so we remove fields from the default view
+   
+2) allow dbTable defaul views to be specified in advance and
+   assume the default view is all we want
+   
+3) addition - no fields until the column specifiers encountered and they 
+   add named fields - wordy and breaks existing behaviour
+   
+4) combine 2 & 3       
+
+Side issue - specify fields with extra attribute tag, eg:
+<column number='0' fieldName='Phone' align='left'>
+or add extra elements within <table> and preceding any <column> elements    

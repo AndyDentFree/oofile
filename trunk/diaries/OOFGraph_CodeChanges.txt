@@ -1,0 +1,2183 @@
+The following file restrucuring was carried out on 10 July 1996:
+All "original" files have been deleted.
+
+Original					Target
+
+TitleObject.h				oofGeos.h
+XlabelObject.h				oofGeos.h
+YlabelObject.h				oofGeos.h
+Geo.h						oofGeos.h
+ColumnObject.h				oofGeos.h
+BarObject.h					oofGeos.h
+SectorObject.h				oofGeos.h
+TextObject.h				oofGeos.h
+XAxisObject.h				oofGeos.h
+YAxisObject.h				oofGeos.h
+CircleObject.h				oofGeos.h
+XTicklabelObject.h			oofGeos.h
+YTickLabelObject.h			oofGeos.h
+PointObject.h				oofGeos.h
+LegendObject.h				oofGeos.h
+oofBarGraph.h				oofGrphs.h
+oofStackedbarGraph.h		oofGrphs.h
+oofPointGraph.h				oofGrphs.h
+oofXYGraph.h				oofGrphs.h
+oofPieGraph.h				oofGrphs.h
+oofColumnGraph.h			oofGrphs.h
+oofGraph.h					oofGrphs.h
+oofDrawStyle.h				oofDStyl.h
+oofPattern.h				oofDStyl.h
+oofColour.h					oofDStyl.h
+oofSymbol.h					oofDStyl.h
+oofDrawStyleSet.h			oofDStyl.h
+oofTextSizer.h				oofTxtSz.h
+oofColorable.h				oofClrbl.h
+TransformationManager.h		oofTrMgr.h
+oofGraphWindow.h			oofGrWin.h
+GraphTestApp.h				GrTstApp.h
+CPlotPane.h					-----
+PlotBitsItem.h				oofPlBit.h
+PlotBits.h					oofPlBit.h
+oofSeries.h					oofSrSet.h
+oofSeriesSet.h				oofSrSet.h
+SeriesSetItem.h				oofSrSet.h
+
+ -=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+INTEGRATION
+96/07/15
+GraphWindow.PPob
+- renumbered Display window as 29003, Print window as 29004
+- changed class ID of Display window to 'GrWn' so will create custom window type
+
+OOFGeos.cpp
+- renumbered constants to match above.
+
+
+CLASS	oofGraphWindow
+- class_ID = 'GrWn' added
+- mDisplayWindow removed
+
+Method	dtor
+		- don't delete mDisplayWindow
+
+Method	RegisterClass
+		- added oofGraphWindow::CreateFromStream
+		
+Method	CreateFromStream
+		- static factory added
+		
+Method	ctor(stream)
+		- added to pass stream on to base LWindow
+
+
+CLASSes	oofGraphWindow descendants
+		- all removed - added static CreateXXXGraphWindow methods instead
+		
+				
+				
+CLASS	oofGraph
+Method	ctor(Rect, oofColor)
+		- removed
+		
+Method	finishConstruction
+		- add pure virtual
+		
+		
+CLASSes	oofGraph descendents
+Method	FinishConstruction
+		- rename to finishConstruction & make public virtual
+		
+Method	ctor(Rect, oofColor)
+		- removed
+		
+Method	ctor(dbView *theView...)
+		- removed
+		
+						
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+ADD COPY TO CLIPBOARD
+96/07/16
+CLASS	oofGraphWin
+Method	CopyToScrap
+		- added (by Ken)
+		
+Method	ObeyCommand
+		- add cmd_Copy
+		
+Method	FindCommandStatus
+		- add cmd_Copy
+		
+						
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+ADD TEXT TRAITS
+96/07/16
+CLASS	CPlotPane
+- mTxtrID added
+
+Method	ctor(SPaneInfo
+		- add mTxtrID param
+		
+Method	ctor(LStream
+		- read the mTxtrID
+
+Method	ctor()
+		- init mTxtrID(0)
+				
+Method	DrawSelf						
+		- if mTxtrID, set the text traits
+		
+		
+GraphWindow.PPob
+		- add custom type 'PltP' with text traits (UInt32)
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+CLEANUP TEST PROGRAM
+96/07/16
+Move
+- temperaturetest
+- mathdb
+- studentdb
+
+into GrTstApp
+
+
+Edit ALRT 'AboutBox' in OOFGraph.rsrc
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+FIX WEIRD CRASHING BUG & RESIZE BUG
+ADD LINE GRAPHS TO OOFGRAPH
+96/07/18
+CLASS	oofSeries
+Method	setLastGeo
+		- added
+		
+Method	lastGeo
+		- added
+		
+Method	ctor(all)	
+		- added mLastGeo(0) to initialiser list
+		
+Data	Geo*	mLastGeo
+		- added
+		
+CLASS	PointLineObject
+created for the first time:
+
+class PointLineObject : public PointObject {
+public:
+		PointLineObject(int XIdeal, int YIdeal, oofSeries* SeriesPtr = 0,
+PositionState = posNone);
+		PointLineObject*	lastPoint() { return mLastPoint; };
+protected:
+	virtual void	drawSelf(const oofDrawStyle*);
+	PointLineObject*	mLastPoint;	// for linking points
+};
+
+CLASS	oofPointLineGraph
+created for the first time.
+Exactly the same as oofPointGraph except append(new oofPointLineObject.. )
+instead of append(new oofPointObject.. ).
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+FIX WEIRD CRASHING BUG & RESIZE BUG
+(Occasional Bus errors, when resize)
+96/07/18
+CLASS	oofTextSizer
+Method	StoreLineLength
+		- change assert from > to >= so doesn't assert too early
+		   (this seems to be the cause of the crashes - something about an assertion 
+		    failure at this point in the program crashes right out!)
+		    
+Method	CalculateWrapping
+		- change sizeLeft calc at end of routine so properly calculated if last word 
+		  fits exactly.
+		  
+		  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+22 July 1996
+ADDED 8-COLOUR SET
+CLASS oofDrawStyleSetDefaultIteration
+Method	getNextDrawStyle
+		- added several new colour combinations 
+
+22 July 1996
+ADD NON GREY SCALE PATTERNS TO MONO PATTERN SUBSTITUTION SET
+CLASS oofDrawStyleSetDefaultIteration
+Method	getNextDrawStyle
+	- added GetIndPattern() call to case statements
+	- used patterns: 4,22,2,20,6,25,26,14
+	- added monoPat.set() after case statements
+	
+CLASS oofPattern
+Method	set(Pattern inPattern)
+	- added
+
+23 July 1996
+CHANGE SIZE OF SYMBOLS
+CLASS oofSymbol
+Method	getSymbolSizeX()
+		- added
+		getSymbolSizeY()
+		- added
+		
+CLASS all descendents of oofSimpleSymbol
+Method	drawSelf()
+		- assigned return value of getSymbolSizeX/Y() to internal variable x/y.
+		- used this variable to get x/y offsets
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+24 July 1996
+ADDED QUANTITY DIGITS TO THE TOP OF BARS
+CLASS ColumnObject
+Method	drawSelf
+	- modified to draw centred text over columns
+	- later change size down to 10 pt, offset only 2 pts above the bar and draw the 
+	  text Before the bar so it doesn't erase the top line
+	  
+	  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/07/24
+CHANGE DEFAULT TO CALCULATE INDEFINITE SET OF COLORS
+CLASS	oofDrawStyleSetDefaultIteration
+Method	getNextDrawStyle
+		- use CalculateColor, instead of fixed color numbers
+		- use black pattern to enable distinguishing more colors
+		
+Method	CalculateColor	 
+		- added based on modulus calculations
+		
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+25 July 1996
+ADDED QUANTITY DIGITS TO THE RIGHT OF BARS
+CLASS BarObject
+Method	drawSelf
+	- modified to draw centred text to the right of bars
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+25 July 1996
+MAKE LEGEND TEXT LEFT ALIGNED
+CLASS LegendObject
+Method drawSelf
+	line 939:	int loc=(mLegendWidth-11-lengths[rownum])/2+11;
+		replaced by:
+				int loc=/*(mLegendWidth-11-lengths[rownum])/2+*/12;
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+30 July 1996
+MAKE SETTING INTERFACE FOR GRAPHS
+CLASS oofSettings
+-added
+
+class oofSettings; forward dec in oofGrphs.h
+
+CLASS oofGraph
+public:
+	oofGraph(oofSettings *Settings = 0);
+	oofSettings*	settings();
+	static	void	defaultSettings(oofSettings*);
+private:
+	oofSettings *mSettings;
+	static	oofSettings *sDefaultSettings;
+	static unsigned int sNumGraphs;	// number of graphs created
+	
+Method ctor
+	added:
+	if (oofGraph::sNumGraphs++ == 0)
+		oofGraph::sDefaultSettings = new oofSettings;	// use default ctor
+		
+Method dtor
+	added:
+	if (--oofGraph::sNumGraphs == 0)
+		delete oofGraph::sDefaultSettings;
+		
+Method settings()
+	- created
+	
+Method defaultSettings()
+	- created
+	
+CLASS LegendObject
+Method	drawSelf()
+	oofGeos line 906: if (oofGraph::currentGraph()->settings()->hasLegend()) {
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/08/07
+ADDED SCALES TO AXES - Ken
+CLASS oofScaleSizer
+	- added
+
+CLASS various graphs
+Method finishConstruction
+	- code for actually drawing scales added after
+	sections that add the axes.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/8/12
+OOFDRAWSTYLEARRAY ADDITION
+CLASS oofGraph
+Method	setDrawStyleSet
+	- now called setDrawStyles
+	
+Method	setDrawStyles(oofDrawStyleArray&)
+	- added
+	
+CLASS	SeriesSet
+Method	setDrawStyleSet
+	- now called setDrawStyles
+	
+Method	setDrawStyleSet(oofDrawStyleArray&)
+	- added
+	
+CLASS oofDrawStyleArray
+	- created
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/8/12
+MORE SETTABLE FUNCTIONALITY
+CLASS	oofSettings
+Enum	enum PositionState { posTop, posLeft, posRight, posBottom, posCentre }
+		- added
+		
+Method	bool showsQuantities() const
+		void showsQuantities(bool)
+		- removed
+		
+Method	bool hasValuesOverColumns() const
+		void hasValuesOverColumns(bool)
+		bool hasValuesNextToBars() const
+		void hasValuesNextToBars(bool)
+		PositionState TitlePos() const
+		void TitlePos(PositionState)
+		PositionState XLabelPos() const
+		void XLabelPos(PositionState)
+		PositionState YLabelPos() const
+		void YLabelPos(PositionState)
+		- added
+
+Data	corresponding data members removed/added
+
+CLASS	LegendObject
+Method	BoundingRect
+	- uses ::SetRect(), based on the hasLegend of the settings object
+	
+CLASS	TextObject
+Method	drawSelf()
+		logic for left justified text added, with ref to the settings object
+		for the current graph.
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/8/13
+FURTHER SETTABLE FUNCTIONALITY
+CLASS	TitleObject
+		XLabelObject
+		YLabelObject
+		XTickLabelObject
+		YTicklabelObject
+Method	drawself()
+		- added: overrides TextObject drawSelf()
+		- allows logic for settings to work
+		
+CLASS	XAxisObject
+		YAxisObject
+Method	drawself()
+		- added logic for settings
+		
+CLASS	oofSettings
+Method	bool hasXAxisTicks() const
+		void hasXAxisTicks(bool)
+		bool hasYAxisTicks() const
+		void hasYAxisTicks(bool)
+		bool hasXTickLabels() const
+		void hasXTickLabels(bool)
+		bool hasYTickLabels() const
+		void hasYTickLabels(bool)
+		
+Method	ctor, copy ctor, dtor
+		- expanded to take new settables
+		
+Data	for each new settable
+		
+CLASS	oofDefaultSettings
+Method	ctor
+		- modified to incorporate all the new setting defaults
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/8/15
+CLASS	SeriesSet
+Method	setDrawStyles
+		- no longer uses getNextDrawStyle
+		
+CLASS	oofDrawStyleArray
+Method	append
+		operator<<
+		item
+		adopt
+		count
+		deleteAll
+		- added
+Basically, this class has been completely rewritten, to use an OOF_ExpandableLongArray.
+
+CLASS	oofDrawStyleSetSupplied
+- modified to adopt supplied oofDrawStyleArray storage in ctor. Draw styles are stored internally in a concrete oofDrawStyleArray object.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+BUGFIX TO SETTINGS
+96/08/19
+CLASS	oofGraphx
+Method	getLocalSettings
+		- added (was declared but not implemented)
+		
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+MINOR IMPROVEMENTS TO APPEARANCE/USABILITY
+96/08/19
+PPob	DisplayWindow
+		- add close box, which means it will also respond to cmd_Close
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+BUGFIX TO TEXT DRAWING (seen as TICK Lables offset)
+96/08/23
+CLASS	oofGraph
+Method	draw
+		- call becomeCurrent, so settings will retrieve correct graph!!!!
+		
+		
+CLASS	oofSettings
+- removed enum PositinState - use Geo::
+
+
+CLASS	TextObject
+Method	drawSelf
+		- include a switch on the mPosition enum, to determine alignment
+		
+		
+CLASS	TitleObject
+		XLabelObject
+		YLabelObject
+		XTickLabelObject
+		YTicklabelObject
+Method	drawself()
+		- set mPosition from the appropriate setting, in case alignment changed since 
+		  construction
+		- call parent TextObject::drawSelf, don't contain copy of code.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+ADD SOME SIZERS & FIX A BUNCH OF oofSettings BUGS!!!!
+96/08/23
+constants moved to settings
+		- maxYLabelLen
+		- minTickSize
+		- majTickSize
+		- maxLegendLen
+
+CLASS	oofSettings
+		- renamed to oofGraphSettings
+		- renamed data members to match settings methods, eg mTitle - > mHasTitle
+		
+- added methods, and data values for
+		unsigned short*	maxYLabelLen;
+		unsigned short*	maxLegendLen;
+		unsigned short*	minorTickSize;
+		unsigned short*	majorTickSize;
+
+Method	dtor
+		- delete new settings 
+		- wrap all deletes in a check of mRefCount, with dec
+		
+Method	copy ctor
+		- init all pointers to 0
+		- conditionally copy all items from rhs (we are NOT sharing pointers)		
+		
+Method	ctor
+		- init new settings 
+		- change mRefCount to init(1)	
+		
+
+CLASS	oofDefaultSettings
+		- renamed to oofGraphDefaultSettings
+		
+				
+CLASS	LegendObject
+Method	ctor
+		- use setting maxLegendLen
+		
+		
+CLASS	YLabelObject
+		- use setting maxYLabelLen		
+		
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+FIX BUGS IN DISPLAY OF Y AXIS TICKS & LABEL POSITIONS
+96/08/26
+CLASS	oofBarGraph
+Method	finishConstruction
+		- offset the YTickLabelObject by SeriesHeight/2, not SeriesHeight
+		
+		
+		
+CLASS	oofStackedBarGraph
+Method	finishConstruction
+		- offset the YTickLabelObject by BarWidth/2
+		- add BarWidth to the length of YAxisObject, so axis goes to top of bar
+			
+				
+PPob	DisplayWindow
+		- reduce the size of the CPlotPane within by 10 pixels in both directions to 
+		  allow for the resize box (previously overlapping the axis, if no legend)		
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/28
+COSMETIC FIXES
+
+CLASS	TitleObject
+Method	Transform
+		- transform the title rect, instead of defaulting to top of window
+		
+
+CLASS	YLabelObject
+Method	Transform		
+		- transform mXDraw correctly, instead of just being locked at ideal position
+		- remove +2 adjustment to mXDraw
+		
+		
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/29
+MAKE IT EASIER TO ADD GRAPHS TO REPORTS
+
+
+CLASS	oofGraph
+- mDrawStylesWereSet added
+- mView added to provide optional owned view (can override)
+- mTitle added
+
+Method	setTitle
+		- added
+
+Method	setView
+		- added
+		
+Method	ctor
+		- init mView(0)
+		
+Method	dtor
+		- delete mView
+				
+Method	setDrawStyles (both)
+		- set mDrawStylesWereSet = true
+		
+Method	ctor
+		- init mDrawStylesWereSet(false)
+		
+Method	drawStylesWereSet
+		- added to return mDrawStylesWereSet
+		
+Method	finishConstructionWithPresets
+		- added to give something to call when the graph has had its title and view
+		  set, as from a report
+		  
+		  
+CLASS	oofGraphSettings
+- mYAxisHeight added with getter & setter methods
+
+Method	ctor
+		- init mYAxisHeight(0)
+		
+Method	copy ctor
+		- copy rhs mYAxisHeight
+		
+Method	dtor
+		- delete mYAxisHeight
+		
+		
+
+CLASS	oofGraphDefaultSettings
+Method	ctor
+		- init YAxisHeight(0)				  
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/29
+REPLACE PASCAL STRINGS WITH C-STRINGS IN GRAPHS
+Reason - awkward to integrate with reports.
+
+Also was existing bug in DrawText being called on mTextStringPtr instead of &mTextStringPtr[1]. 
+
+
+
+- change param type from StringPtr to const char* in all descendents of oofGraph::finishConstruction (used as window title)
+
+
+
+CLASS	TextObject
+- mTextStringPtr changed to OOF_String mText
+
+Method	drawSelf	
+		- change to mText
+
+Method	Transform	
+		- change to mText
+		
+Method	dtor
+		- don't delete mTextStringPtr
+		
+				
+							
+- change to mText in
+	TitleObject::Transform
+	XLabelObject::Transform
+	XTickLabelObject::Transform
+	YTickLabelObject::YTickLabelObject
+	
+	
+- rewrite use of Str255 with OOF_String in	
+	oofBarGraph::finishConstruction	
+	
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b2d11 internal release 
+
+CLASS	TitleObject
+Method	Transform
+		- calculate mYDraw correctly
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OVERLAY GRAPH UPDATES
+97/01/25
+
+* Modified oofSeries to include a boolean to signify whether the series
+  is displayed as a symbol or a coloured swatch
+
+* Modified LegendObject::draw() to make use of the above
+
+* Added accessor functions to oofSeries for the above
+
+* Added operator[] for SeriesSet to get at the accessors !
+
+
+* modified oofStackedBarGraph to allow for overlays:
+
+  * Added members mOverlayView and mOverlayNum
+
+  * Added accessors for the above
+
+  * Overlays can be added as a View or as an item (or items) in the
+    original view.
+
+  * Added code to finishConstruction to add both types of overlay
+    GEOs - both can happily coexist on the same graph, with the
+    overlay view being added after the overlays on the original
+    view
+
+
+* modified oofGrWin to add two new window types for adding overlays at
+  that level - a bit hacky, but OK
+
+
+* modified the test apps for graphs to demonstrate both kinds
+
+* NOTE the comments on sorting and overlays within the original view
+  in GrTstApp.cp
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+NEW ORDINAL GRAPH PLUS BUGFIX
+97/01/27
+
+* Fixed bug which caused memory eating (introduced two days ago) due to
+  incorrect usage of OOF_String::adopt !
+
+* Added oofOrdinalStackedBarGraph type and matching window factory
+
+* Added code to generate an addition to the X-axis label to show
+  ordering of bars in the stacks..
+
+* NOTE: oofOrdinalStackedBarGraph's can have view overlays, but don't
+        work with "last series overlaid" overlays !
+
+* Built example data for OrdinalStackedBarGraph demo.
+
+
+		
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/16
+BE ABLE TO COMPILE MAC PROJECTS WITHOUT PRECOMPILED HEADERS & CLEANUP FILENAMES
+(see also OOFILE Code Change Diary & OOFrep Code Change Diary)
+
+ADD #IFDEF'D INCLUDES
+oofTrMgr.cpp
+#include <Quickdraw.h>
+- change #include "oofbool.hpp" to "oof0.hpp" so get _Macintosh defined
+
+oofcolor.cpp
+#include <Quickdraw.h>
+
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/10 
+MINOR ADJUSTMENTS
+
+CLASS	TitleObject
+Method	ctor (both)
+		- change mIdealTextSize from 30 to 18
+		
+		
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/15
+INCLUDE WINDOWS SOURCES & ADD IN ABOVE CHANGES (from 25/01 onwards)
+
+oofDstyle.hpp
+- add #include oofrect
+
+oofGrWin.* renamed to avoid confusion between MFC and PowerPlant
+- oofGrPP.*
+- oofGrMFC.*
+
+
+LegendObject::drawSelf
+- copy isSymbol test
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/17
+RENAME CLASSES TO MATCH "oof" STANDARD BEFORE PUBLIC RELEASE
+
+BarObject -> oofGeoBar
+CircleObject -> oofGeoCircle
+ColumnObject -> oofGeoColumn
+LegendObject -> oofGeoLegend
+LineObject -> oofGeoLine
+PointObject -> oofGeoPoint
+SectorObject -> oofGeoSector
+TextObject -> oofGeoText
+TitleObject -> oofGeoTitle
+XLabelObject -> oofGeoXLabel
+XTickLabelObject -> oofGeoXTickLabel
+YLabelObject -> oofGeoYLabel
+YTickLabelObject -> oofGeoYTickLabel
+XAxisObject -> oofGeoXAxis
+YAxisObject -> oofGeoYAxis
+Geo -> oofGeo
+LabelledGeo -> oofLabelledGeo
+PlotBits -> oofPlotBits
+PlotBitsItem -> oofPlotBitsItem
+SeriesSet -> oofSeriesSet
+SeriesSetItem -> oofSeriesSetItem
+TransformationManager -> oofTransformationManager
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/23
+VARIOUS BUGFIXES & ALLOW FLOATING POINT INPUT
+
+CLASS	oofGeoXAxis
+Method	Transform
+		- if Y values large, incorrectly calc height of X-ticks
+
+
+* Added oofGraphData class for processing different data sets - currently
+copes with all of the original graph types, and adds the ability for
+variables that used to be restricted to longints to be real - hurray !
+
+* Made many changes to all of the graph's finishConstruction functions to
+make use of the oofGraphData class.
+
+* FINALLY - added correct axes for the XY graph - hurray !
+
+* Modified the Graph Test to display a real XY graph and Oridinal Stacked Bar.
+
+
+
+NOTE:
+
+1)  I have not dont any work on the column and bar labels, these will be
+wrong for floating point graphs at this time
+
+2)  There may be rounding errors in floating point graphs of very low
+numbers - ie: less than 0.01 - This can be fixed by a smarter scaling
+engine - LATER
+
+3) You will need to add "oofGrDta.cpp" to all your graph projects
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/23
+ADD EXTRA SETTINGS - CONTROL IF HAVE X AND Y AXIS LABELS
+
+CLASS	oofGraphSettings
+- mHasXAxisLabel, mHasYAxisLabel added
+
+Methods added (paired setter/getter)
+- hasXAxisLabel
+- hasYAxisLabel
+
+Method	ctor
+		- init mHasXAxisLabel(0), mHasYAxisLabel(0)
+
+Method	copy ctor
+		- copy mHasXAxisLabel, mHasYAxisLabel
+
+Method	dtor
+		- delete mHasXAxisLabel, mHasYAxisLabel
+
+
+CLASS	oofGraphDefaultSettings
+Method	ctor
+		- init hasXAxisLabel(true), hasYAxisLabel(true)
+		
+		
+Check new settings in finishConstruction() method for classes:
+- oofBarGraph	
+- oofColumnGraph
+- oofLineGraph
+- oofOrdinalStackedBarGraph
+- oofPointGraph
+- oofStackedBarGraph
+- oofXYGraph
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/23
+ADD EXTRA SETTING - LENGTH OF Y TICK LABELS
+
+CLASS	oofGraphSettings
+- mMaxYTickLabelLen added
+
+Method	maxYTickLabelLen
+		- added (paired setter/getter)
+
+Method	ctor
+		- init mMaxYTickLabelLen(0)
+
+Method	copy ctor
+		- copy mMaxYTickLabelLen
+
+Method	dtor
+		- delete mMaxYTickLabelLen
+
+
+CLASS	oofGraphDefaultSettings
+Method	ctor
+		- init mMaxYTickLabelLen(100)
+
+		
+Check new settings in finishConstruction() method for classes:
+- oofBarGraph	
+- oofColumnGraph
+- oofLineGraph
+- oofOrdinalStackedBarGraph
+- oofPointGraph
+- oofStackedBarGraph
+- oofXYGraph
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/23
+CLEANUP JAMES' CODE (AFTER MFC INTEGRATION)
+All the following "removed" code is commented out with an UnJames comment 
+just in case I'm wrong!
+
+
+CLASS	oofGeo
+Method	BoundingRect
+		- move virtual method out of header
+		
+Method	GetAlreadyTransformedBoundingRect
+		- removed
+		
+Method	UpdateMargins
+		- removed
+		
+
+
+CLASS	oofGeoLegend
+Method	GetAlreadyTransformedBoundingRect
+		- removed
+				
+				
+CLASS	oofGeoTitle
+Method	Transform				
+		- remove call to GetAlreadyTransformedBoundingRect as return variable is
+		  not used
+		
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/23
+REWORK MY NEW SETTINGS
+(make them runtime settable, like hasLegend & hasTitle)
+CLASS	oofGeoSuppressibleText
+- added subclass of oofGeoText with pure virtual method shouldDraw
+
+
+CLASS	oofGeoTitle
+- made subclass of oofGeoSuppressibleText
+Method	BoundingRect, drawSelf
+		- moved up to oofGeoSuppressibleText
+		
+Method	shouldDraw
+		- added		
+
+
+CLASS	oofGeoXLabel, oofGeoYLabel
+- made subclasses of oofGeoSuppressibleText
+
+Method	Transform				
+		- check the setting hasXXX to see if need bother
+
+				
+Do NOT Check new settings in finishConstruction() method 
+(always add the object, in case we toggle the setting later)
+for classes:
+- oofBarGraph	
+- oofColumnGraph
+- oofLineGraph
+- oofOrdinalStackedBarGraph
+- oofPointGraph
+- oofStackedBarGraph
+- oofXYGraph
+		
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/24
+FIX A BUG JAMES APPEARS TO HAVE INTRODUCED - SYMBOLS NOT SHOWN IN LEGENDS
+
+CLASS	oofPointGraph, oofLineGraph, oofXYGraph
+Method	finishConstruction
+		- pass in optional param true to findSeriesByName so it gets a symbol
+		   series, rather than normal colour swatch
+		   
+		   
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+VERSION 1.3b3 released  6th April 1997
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/07
+ABILITY TO SET TICK LABEL MASKS - MAINLY CONTROL DECIMALS ON FLOATING POINT
+
+CLASS	oofGraphSettings
+- mIntTickLabelMask, mRealTickLabelMask added
+
+Method	ctor
+		- init mIntTickLabelMask(0), mRealTickLabelMask(0)
+		
+Method	copy ctor
+		- copy mIntTickLabelMask, mRealTickLabelMask
+		
+Method	dtor
+		- delete mIntTickLabelMask, mRealTickLabelMask
+				
+Method	intTickLabelMask, realTickLabelMask
+		- added setters and getters
+		
+		
+CLASS	oofGraphDefaultSettings
+Method	ctor
+		- init intTickLabelMask("%d"), realTickLabelMask("%5.0f")
+		
+
+CLASS	oofGraphData
+Method	setScaleString
+		- use the new mask settings
+		- cast the scaled real number using (double) instead of (float)
+		
+		
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/04/26
+ALLOW OVERLAY VIEWS TO USE FLOATS
+* Modified oofGraphData to allow for overlay views to be of either long or
+real type by adding accessors that use the same type as the data - NOTE:
+This assumes that the overlay data type is the same as the actual data type
+- perhaps it should check.
+
+* Modified the finishConstruction's of the two graph types that supported
+overlay views (Stacked Bar and Ordinal Stacked Bar) to make use of the
+above new ability of oofGrDta.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/09
+REACT TO MERCATOR REPORT OF FLOAT OVERLAYS NOT WORKING
+* Added an assertion to make sure that overlay views have the same data type
+  as the original data view
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d7 put on CW12 as demo
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/17
+KEN'S FIXES TO SCALES GENERATING WEIRD VALUES IN SOME CIRCUMSTANCES
+
+* Fixed a bug in oofScaleSizer which caused "integer-like" (eg: 90) values
+to fall into the classification of "order-like" (eg: 100, 1000) values, and
+subsequently get very odd scale results.
+
+* Fixed a bug that caused "non-order-like" values that were on a sub-order
+(2,5) to be promoted (due to an odd bug with subtraction of coerced short
+integers)
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/18
+COMPILE UNDER MS VISUAL C++ & INTEGRATE JAMES NEWER SOURCE (DATES FROM 
+PORTING REPORT-WRITER, MINOR CHANGES TO GRAPHS AND UTILS)
+
+CLASS	oofGeoSuppressibleText
+- add protected: so ctors are accessible from subclasses
+(dunno why CodeWarrior allows this!)
+
+
+oofDrawStyle::useStyleColors
+oofEcsSymbol::drawSelf
+oofCrossSymbol::drawSelf
+oofCircleSymbol::drawSelf
+oofSquareSymbol::drawSelf
+oofGeoColumn::drawSelf
+oofGeoSector::drawSelf
+oofGeoText::drawSelf
+oofGeoText::calcCharHeight
+oofGeoText::setFontSize
+oofGeoText::cleanupFont
+oofGeoXAxis::drawSelf
+oofGeoYAxis::drawSelf
+oofGeoLegend::drawSelf
+oofGeoLegend::setFontSize
+oofGeoLegend::cleanupFont
+oofGeoCircle::drawSelf
+- use oofCurrentDraw instead of oofGraph::currentGraph()
+
+
+CLASS	oofGraph
+- mhdc removed
+Method	getCurrentDC
+		- removed
+		
+Method	setCurrentDC
+		- call oofCurrentDraw		
+
+Method	setPaneRect(oofRect inRect)
+		- added
+		
+CLASS	oofRect
+Method	transform		
+		- added (two variants)
+		
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/18
+FIX BUG WITH MULTIPLE LINE LEGENDS DRAWING BACK TO FRONT
+CLASS	LegendObject
+Method	drawSelf
+		- process rows in ascending, not descending order
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/06/01
+FIX REDRAWING OF GRAPH APPEARING IN DIFFERENT FACE
+
+CLASS	oofGraph
+Method	draw
+		- reset TextFace(0) in case our context is different
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/06/01
+FIX LEGEND FRAME NOT PROPERLY ENCLOSING TEXT
+(problem with font sizes being set but not fonts - calcs at different times get different font info so font leading may cause 1 pixel differences in charHeight)
+
+CLASS	oofGeoLegend
+Method	ctor
+		- remove redundant call to setFontSize as is called from calcCharHeight
+
+Method	drawSelf
+		- remove redundant call to setFontSize as is called from calcCharHeight
+		- recalculate mLegendHeight (if font leading has changed from ctor time)
+		- compute blockHeight = charHeight * numRows, to simplify logic
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/06/04
+WINDOWS COMPATABILITY
+
+CLASS	oofGraph
+Method	getCurrentDC, setCurrentDC
+		- added
+		
+		
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/06/12
+FIX MINOR BUGS WITH DIFFERENT CONFIGURATIONS & INTEGRATE ELEMIR MODS
+
+CLASS	oofGeoLegend
+Method	drawSelf
+		- put back in calls to setFontSize as they are significant on Win
+		
+Most classes - prefix with OOFGRAPH_EXPORT		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/21
+PRINT GRAPHS IN MONO
+
+Suppress the FrameRect in
+- oofGeoBar::drawSelf
+- oofGeoColumn::drawSelf		
+
+
+CLASS	oofDrawStyleSetDefaultIteration
+Method	getNextDrawStyle		
+		- change order to get mono patterns increasingly darker
+		
+
+CLASS	oofPattern
+enum 	ePattern
+		- added ltstripes, stripes, dkstripes, ltdots, dots, dkdots
+		
+Method	MacPattern		
+		- return new patterns for the ePattern extra values
+		
+				
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/02
+REMOVE SUBTITLE OF ORDINAL BAR GRAPH AS IT IS HIGHLY MISLEADING
+(only shows values on last series, NOT indicative of whole)
+
+CLASS	oofOrdinalStackedBarGraph
+Method	finishConstruction
+		- don't append the series ordinal values to the X axis title
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/03
+PRINT GRAPHS IN MONO
+
+CLASS	oofGeoLegend
+Method	drawSelf
+		- only frame key boxes if in colour
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/15
+INTEGRATING ELEMIR CODE
+
+CLASS	oofPattern
+Method	ctor(const ePattern&)
+		- change to take const ePattern, don't bother with ref 
+
+
+CLASS	oofColor
+Method	ctor(const eColor&)
+		- change to take const eColor, don't bother with ref 
+		
+
+CLASS	oofTransformationManager
+- mDirty changed from int to bool
+
+several classes marked with OOFGRAPH_EXPORT
+		
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/25-26
+FIX USE OF STREAMS THROUGHOUT
+
+CLASS	oofLabelledGeo
+Method	Transform
+		- use stringstream instead of strstream, and use OOF_String for 
+		extraction of data from the stream
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/11/17
+INTEGRATE KEN'S PIE CHARTS (FIRST RELEASE)
+
+CLASS	oofGraphWindow
+Method	CreatePieChartWindow
+		- added
+		
+		
+CLASS	oofGeoSector
+Method	BoundingRect
+		- added
+		
+Method	drawSelf		
+		- subtract diameter from Y value
+		
+Method	Transfer
+		- 		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/06
+INTEGRATE ELEMIR'S PIE CHARTS FOR WINDOWS
+
+CLASS	oofGeoSector
+Method	drawSelf
+		- add in ArcAngle to ptStart
+		- don't add in ArcAngle to ptEnd
+		
+Method	CalcRadialFromAngle
+		- halve the differences right-left & bottom-top
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d13 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/29
+INTEGRATE KEN'S 3D EFFECTS & LEGEND OFFSET SETTING
+
+oofGeoColumn::drawSelf
+oofGeoBar::drawSelf
+- draw 3D effects for Mac
+
+oofGeoColumn::BoundingRect
+oofGeoBar::BoundingRect
+- expands ideal rect to include room for 3D effects if required
+
+oofGeoSector::drawSelf
+- commented out start - lacks ellipsizing logic
+
+oofGeoLegend::BoundingRect
+- allow for offset as per setting
+
+oofGeoLegend::Transform
+- do the legend offset in the transform
+
+oofGraphSettings
+- mlegendOffset, mHas3DEffect, m3DEffectMultiplier added with setters, getters
+
+Method	ctor
+		- init has3DEffect(false), mlegendOffset(0), m3DEffectMultiplier(0.5)
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/30
+IMPROVE 3D GRAPH PRINTING
+
+if mono & 3D, don't vary the colours before do the FillRegion for the sides and top, and use FrameRect to draw rects.
+- oofGeoColumn::drawSelf
+- oofGeoBar::drawSelf
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/30
+REMOVE CRASHES PRINTING GRAPH WINDOW WITH CW PRO2
+
+CLASS	oofGraphWindow
+Method	RegisterClass
+		- use RegisterClass_ macro to register LPlaceHolder
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/31
+INTEGRATE ELEMIR'S 3D EFFECTS FOR WINDOWS
+
+CLASS	oofColor
+Method	set
+		- don't divide colors by 257, just set directly
+
+Add 3D rendering in
+- oofGeoColumn::drawSelf
+- oofGeoBar::drawSelf
+
+
+CLASS	oofGraphSettings		
+- set OOFGRAPH_EXPORT again
+
+	
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d16 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/05/07
+CROSS-PLATFORM LINE ENDINGS
+
+CLASS	oofGeoText
+Method	drawSelf
+		- use unsigned longs because of changes in oofTextSizer
+
+use unsigned longs because of changes in oofTextSizer
+- oofGeoYLabel::Transform
+- oofGeoLegend::oofGeoLegend
+- oofGeoLegend::drawSelf
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/14
+NEW WINDOWS DRAWING - DON'T USE ENHANCED METAFILE
+
+use oofTextDrawer for output and fonts in
+- oofGeoText::setFontSize
+- oofGeoText::cleanupFont
+- oofGeoLegend::calcCharHeight
+- oofGeoText::calcCharHeight
+- oofGeoLegend::setFontSize
+- oofGraphWindow::start
+- oofGraphWindow::OnDraw
+- oofGraphWindow::OnPrint
+
+
+FILE	oofGrMFC.cpp
+- add #include "oofDraw.h"
+
+
+CLASS	oofGraphWindow
+- check OOFILE_USE_OLDMETAFILE to name member mhmf or mehmf
+
+Method	ctor
+		- check OOFILE_USE_OLDMETAFILE to decide which metafile to init
+		
+Method	dtor
+		- check OOFILE_USE_OLDMETAFILE to decide which metafile to destroy
+
+Method	start
+		- call oofCurrentDraw::get/setInfoDC and create an IC
+		- check OOFILE_USE_OLDMETAFILE to decide which metafile to init
+		- call setCurrentDC, don't set the clipping region
+		
+Method	finish
+		- check OOFILE_USE_OLDMETAFILE to decide which metafile to init
+
+Method	setPageSetup
+		- call mhdcRef::CreateDC instead of CreateCompatibleDC		
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/16
+FIX ELEMIR'S NEW WINDOWS DRAWING - DON'T USE ENHANCED METAFILE
+CLASS	oofTextDrawer
+Method	resetCoordinates
+		- added
+		
+		  
+CLASS	oofCurrentDraw
+- sCurrentDraw added singleton member
+
+Method	dtor
+		- added to delete infoDC
+		
+Method	makeInfoDC
+		- added factory rather than having external logic to create
+		
+Method	deleteInfoDC
+		- added method that zero's mInfoDC 
+		  (think this was major bug, as not creating again after deleteDC)						  		
+		  
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/19
+FIX  NEW WINDOWS DRAWING - WITH STANDARD METAFILE
+AND WIN32S COMPLIANT
+
+CLASS	oofGraph
+Method	finishConstructionWithPresets		  
+		- add call oofCurrentDraw::makeInfoDC() so it exists before
+		  we measure text in wrapping calcs
+		  
+CLASS	 oofCurrentDraw
+Method	makeInfoDC
+		- when called again, delete and recreate DC
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/24
+FIX BUG IN WRAPPING GRAPH TITLES
+
+CLASS	oofTextDrawer
+Method	selectFont		
+		- as well as selecting font into passed in HDC, 
+		  select into the current IC
+		
+
+
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/06/21
+INTEGRATE ELEMIR'S CHANGES (UP TO 19th) FOR B&W PRINTING
+OF EMBEDDED GRAPHS
+
+CLASS	oofPattern
+- mPatType added with inline accessors patternType
+
+ENUM	ePattern
+		- added solid case
+		
+Method	ctor(oofColor&
+		- default patternType(solid)
+
+Method	set
+		- also set mPatType
+		
+Method	CopyPattern
+		- copy the internal WinPattern except for solid case
+		
+Method	WinPattern
+		- added cases dkdots, dkstripes, ltdots, dots, ltstripes & stripes
+		
+Method	CreateWinBrush
+		- added	to create brushes for the above cases in WinPattern				
+		
+		
+FILE	oofGrMC.cpp
+- #include oofRpRes.h instead of oofGrRes.h
+	
+		
+CLASS	oofGraphWindow
+Method	OnPrepareDC, OnPreparePrinting
+		- added to give similar features to Rep.
+		
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/06/22
+CLEANUP ELEMIR'S CHANGES FOR B&W PRINTING
+OF EMBEDDED GRAPHS
+
+CLASS	oofPattern
+Method	patternType(both)
+		- hide implementation in #ifdef _Windows
+
+
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/06/24
+FIX NT PRINTING
+CLASS	oofCurrentDraw
+Method	makeInfoDC	
+		- don't delete the current InfoDC if set	
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/19-20
+INCORRECT LEADING ON GRAPH LABELS REMOVED
+GetTextMetrics CALL REMOVED
+
+CLASS	oofGeoText
+Method	drawSelf
+
+'descent' variable definition and GetTextMetrics call removed from the
+Windows version of oofGeoText::drawSelf, because these are not needed
+there ('descent' was set into a nonsence anyway, because old metafile
+DC doesn't return the text metrics).
+
+
+CLASS	oofGeoYLabel
+Method	Transform
+
+Updating of 'rcMargins' updated - the label's width (mDrawWidth) is not
+added to the left margin, because it is added in oofPlotBits::append
+method (case oofGeo::posLeft in the switch command) - this caused the
+incorrect leading on graph Y-labels.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/08/05
+COMPILE WINDOWS WITH NEW CONSTANT STRING SEMANTICS
+
+CLASS	oofGeoText
+Method	drawSelf
+		- use oofString::chars() method and a const pointer
+		  instead of (char*)
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/09/02
+TPS MERGE
+
+CLASS	oofPlotBits
+Method	getPaneRect
+		- simple getter added inline
+		
+
+CLASS	oofTransformationManager		
+Method	getPaneRect
+		- simple getter added inline
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/09/03
+MERGE ELEMIR'S FIXES TO GRAPH PREVIEW GETTING WRONG PAGE SIZE 
+
+CLASS	oofGraphWindow
+Method	getPaperSize
+		- don't unlock global structures before copying dimensions
+		
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/09
+FIX BUG - ASSERT WHEN DRAWING LEGEND
+
+CLASS	oofTextDrawer
+Method	SelectFont
+	- remove stupid asserts of return value from SelectObject
+	  (may return nil quite legally)
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/09
+HACKED FIX TO PREVENT WINDOWS LEGENDS DRAWING WITH BAD FONT
+
+CLASS	oofGeoLegend
+Method	cleanupFont
+		- undo an old change
+		::SelectObject(hCurrdc, mSaveFont);
+//		oofTextDrawer::selectFont(hCurrdc, mSaveFont);
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/09
+FIX OVERLY LARGE SPACING BETWEEN WRAPPED TEXT IN WINDOWS GRAPHS
+
+use tmExternalLeading instead of tmInternalLeading in:
+- oofGeoLegend::calcCharHeight
+- oofGeoText::calcCharHeight
+
+
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/13
+REMOVE WINDOWS RESOURCE LEAKS
+
+Remove cleanupFont calls from:
+- oofGeoLegend::oofGeoLegend
+- oofGeoText::drawSelf
+- oofGeoText::Transform
+- oofGeoText::~oofGeoText
+- oofGeoTitle::Transform
+- oofGeoXLabel::Transform
+- oofGeoXTickLabel::Transform
+- oofGeoYLabel::Transform
+- oofGeoYTickLabel::Transform
+
+
+CLASS	oofGeoLegend
+- mSaveFont, mNewFont removed
+
+Method	calcCharHeight
+- removed
+
+Method	cleanupFont
+- removed
+
+
+CLASS	oofGeoText
+- mSaveFont, mNewFont removed
+
+Method	calcCharHeight
+		- rewrote to call oofTextDrawer with mTextSize as default
+
+Method	cleanupFont
+- removed
+
+Method	setFontSize
+		- rewrote to call oofTextDrawer with mTextSize as default
+
+
+CLASS	oofTextDrawer
+- sLastCharHeight added
+- sLastCharHeightRequest added
+- sCurrentFontSize added
+
+Method	calcCharHeight
+- added
+
+Method	cleanupFont
+- added
+
+Method	setFontSize
+- added
+
+Method	selectFont
+		- clear the cached sLastCharHeightRequest
+		
+
+CLASS	oofCurrentDraw
+Method	setCurrentDC
+		- made non-inline
+		- if incoming DC is nil, call oofTextDrawer::cleanupFont
+		
+Method	setInfoDC
+- removed
+
+
+
+call oofTextDrawer::calcCharHeight in:
+- oofGeoLegend::oofGeoLegend
+- oofGeoLegend::drawSelf
+
+call oofTextDrawer::setFontSize in:
+- oofGeoLegend::oofGeoLegend
+- oofGeoLegend::drawSelf
+
+
+
+FILE	oofdraw.cpp
+- added conditional #include "windowsx.h"
+
+
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/21
+COMPILE UNDER MAC WITH NEW DRAWING
+
+CLASS	oofTextDrawer
+- added Mac version with calcCharHeight & setFontSize
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/26
+AVOID BOUNDS CHECKER WARNINGS
+
+CLASS	oofCurrentDraw
+Method	moveToEx
+		- only call ::MoveToEx if valid DC param
+		
+
+CLASS	oofTextDrawer
+Method	cleanupFont
+		- set sFont to zero after deleting, so don't try to 
+		  use or delete it later
+		  
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/24-30, 11/02
+ELIMINATE REPORT MEMORY & RESOURCE LEAKS
+		
+CLASS	oofGraphDefaultSettings
+Method	ctor
+		- don't increment oofRepSettings ref count as init to 1
+		  so was never deleting
+		  
+		  
+CLASS	oofGraph
+Method	dtor
+		- delete mSettings
+		
+		
+CLASS	oofDrawStyle
+Method	dtor
+		- delete mSymbol
+		
+Method	copy ctor
+		- clone rhs.mSymbol
+		
+
+CLASS	oofGraph & all subclasses
+Method	clone
+		- added pure virtual, and concrete version in subclasses
+
+
+CLASS	oofGeoLegend
+- change mSizers from array of pointers to array of oofTextSizers
+  as junior programmer appeared to have misunderstood how to use array
+  of objects (hence dtor had leak, was just deleting array)
+  
+Method	drawSelf
+		- change mSizers alloc and use to remove extra indirection		
+		
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/02
+INCLUDE BRUNO'S CHANGES TO IMPROVE WINDOWS B&W PRINTING  
+
+CLASS	oofPattern
+Method	CreateWinBrush
+		- change the patterns to get better result on 300dpi 
+		printers, due to Windows scaling effects.
+		
+	
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/30
+FIX WINDOWS PRECOMPILED HEADER GENERATION
+
+FILE		oofpch_g.h, .cpp created
+
+replace #include "stdoof.h" with #include "oofpch_g.h" at top of all files in directories:
+- graphs
+
+some files in utils
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/30
+BUILD ALL VC4 TARGETS
+
+CLASS	oofTextDrawer
+- move static int sLastCharHeightRequenst and sCurrentFontSize onto their own
+  lines as DLL target would not build with them on one line!!!
+  
+  
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/01
+BUILD ALL VC5 TARGETS
+
+CLASS	oofTextDrawer
+Method	setFontSize
+		- made platform-specific definitions as complained about 
+		  declaration with BOOL return type but imp with bool
+		  
+
+
+CLASS	oofGraph
+Method	dtor
+		- made virtual (silly sod!)
+		
+				  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/26
+VC5 COMPATABILITY - REMOVE STUPID WARNING ABOUT CONVERSION TO INT
+
+CLASS	oofGeoText
+Method	setFontSize
+		- return result of oofTextDrawer::setFontSize == TRUE to remove
+		  the stupid VC warning that comes when copy a BOOL to a bool
+		  
+				  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/30
+IMPLEMENT TEST VERSION OF NULL RELATIONSHIP SEARCHING FOR OOFTST46
+(pointer Ref only)
+
+CLASS	dbRelRef
+Method	nullRelationship
+		- added to act like an unsigned long ==0
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/12
+COMPILE WITHOUT PRECOMPILED MAC HEADERS
+
+FILE	oofdraw.h
+- add #include <QDOffscreen.h>
+
+FILE	oofdraw.cpp
+- add 	#include <Resources.h>
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/14
+REMOVE OVERHEAD OF STUPID USE OF IOSTREAM
+
+CLASS	oofLabelledGeo
+Method	Transform
+		- remove stringstream created for temporary use and use sprintf
+		  to convert integert to string.
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/16
+FIX MINOR BUG IN GRAPH WINDOW - NOT SETTING TITLE
+
+
+CLASS	oofGraphWindow
+Method	CreateWindow
+		- set window title from param, not the graph title (ie: let the user
+		  set that with a graph they might create)
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/02
+FIX FAILURE TO PRINT ON 360 DPI PRINTER WITH WIN95
+
+CLASS	oofCurrentDraw
+Method	makeDC72dpiLogical
+		- change scaling factor down to 10 not 100 as that violates
+	     16bit range on Win95
+ 
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+ADD VERSION DEFINES TO ALL OOFILE PACKAGES
+
+FILE	oofGrphs.h
+- add OOFVERS_GRAPH
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/08
+MERGE XML REPORTING WITH MAIN CODE BODY
+
+CLASS	oofGraph
+- mType added
+
+Method	getType
+		- added to return mType
+		
+
+CLASS	oofColumnGraph
+Method	finishConstruction
+		- set mType to "column"
+
+CLASS	oofPointGraph
+Method	finishConstruction
+		- set mType to "point"
+
+CLASS	oofLineGraph
+Method	finishConstruction
+		- set mType to "line"
+
+CLASS	oofXYGraph
+Method	finishConstruction
+		- set mType to "line"
+
+CLASS	oofBarGraph
+Method	finishConstruction
+		- set mType to "bar"
+
+CLASS	oofStackedBarGraph
+Method	finishConstruction
+		- set mType to "stacked bar"
+
+CLASS	oofOrdinalStackedBarGraph
+Method	finishConstruction
+		- set mType to "ordinal stacked bar"
+
+CLASS	oofPieChart
+- renamed to oofPieGraph
+
+Method	finishConstruction
+		- set mType to "pie"
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/14
+FIX INCORRECT NAMING CONVENTIONS IN GRAPHS
+
+CLASS	oofStackedBarGraph
+- mNumOverlaid, mOverlayView made protected (were public)
+	
+Method	SetOverlayView
+		- renamed to setOverlayView to reflect public visibility
+	
+Method	SetOverlaid
+		- renamed to setOverlaid to reflect public visibility
+		
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/01
+MAKE OVERLAY VIEW OWNERSHIP CONSISTENT
+(in future will probably move to just adopting incoming views, like reports)
+
+CLASS	oofOrdinalStackedBarGraph
+- make descendant of OOF_mixOverlayableGraph
+- mOverlayView - moved to OOF_mixOverlayableGraph
+
+Method	setOverlayView(dbView*)
+		- moved to OOF_mixOverlayableGraph
+		
+
+CLASS	oofStackedBarGraph
+- make descendant of OOF_mixOverlayableGraph
+- mNumOverlaid, mOverlayView - moved to OOF_mixOverlayableGraph
+
+Method	ctor
+		- pass numOverlaid up to OOF_mixOverlayableGraph
+
+Method	setOverlayView(dbView*)
+		- moved to OOF_mixOverlayableGraph
+
+Method	finishConstruction
+		- don't assert if user specifies mNumOverlaid>numSeries,
+		  just adjust to be numSeries-1
+
+
+CLASS	OOF_mixOverlayableGraph
+Method	dtor
+		- delete mOverlayView
+
+Method	setOverlayView(dbView*)
+		- clone the incoming view, same as oofGraph::setView
+
+Method	setOverlayView(const dbView&)
+		- added to clone incoming
+
+Method	getOverlayView
+		- added simple inline getter
+
+				
+CLASS	oofPieChart
+- rename to oofPieGraph to be consistent with rest		
+
+
+ALL GRAPHS
+Method	ctor
+		- rename view param to indicate cloning
+
+Method	dtor
+		- removed empty dtors and put comment in decl saying 
+		  // uses default dtor, copy ctor
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/02
+DEBUG GRAPHS - FIX OVERLAY NAME IN LEGEND
+
+Data.OverlayField()->fieldName()
+
+CLASS	oofGraphData
+Method	OverlayField
+		- return mOverlayField instead of mDataField
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/07/24
+MERGE GRAPH STATE DUMP FROM DAVID & COMPILE ON WINDOWS
+
+Methods geoType & describe added to all oofGeo classes &
+made const
+- oofGeo
+- oofLabelledGeo
+- oofGeoColumn
+- oofGeoPoint
+- oofGeoLine
+- oofGeoBar
+- oofGeoSector
+- oofGeoText
+- oofGeoSuppressibleText
+- oofGeoTitle
+- oofGeoXLabel
+- oofGeoYLabel
+- oofGeoXTickLabel
+- oofGeoYTickLabel
+- oofGeoXAxis
+- oofGeoYAxis
+- oofGeoLegend
+- oofGeoCircle
+
+Corrected the following describe method because they
+wrongly referred to oofGeo instead of the direct parent
+(contrary to the comment!)
+- oofGeoLine
+- oofGeoSuppressibleText
+- oofGeoBar
+- oofGeoColumn
+
+
+Removed unnecessary overrides of describe in:
+- oofGeoTitle
+- oofGeoXLabel
+- oofGeoYLabel
+- oofGeoXTickLabel
+- oofGeoYTickLabel
+
+
+CLASS	oofGeoXTickLabel
+Method	geoType
+		- corrected (was "oofGeoYLabel")
+
+
+CLASS	oofGraph
+Method	describe
+		- made const
+		- added (rename from log)
+		- take ostream& instead of ofstream&
+		
+Method	DescribeSelf
+		- made const
+		- added (rename from logSelf)
+		- take ostream& instead of ofstream&
+		- don't change draw style to mono, describe it!
+
+
+CLASS	oofPlotBits
+Method	describe
+		- made const
+		- added (rename from log)
+		- take ostream& instead of ofstream&
+		
+Method	DescribeSelf
+		- made const
+		- added (rename from logSelf)
+		- take ostream& instead of ofstream&
+		- remove calls to perform transformation!!!!
+		  (no point in observing if we change the state!)
+		
+
+FILE	oofdstyle.h
+- removed _Windows after a #endif
+
+general rename drawSelf to DrawSelf to match our convention on
+naming protected or private methods
+
+FILE	oofgeos.h
+- add #include "oofios.h"						
+
+
+CLASS	oofGeoLegend
+Method	describe
+		- remove std:: in front of endl as it doesn't work on VC5 old streams
+		
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/08/12
+MERGE DAVID'S GRAPH DEBUGGING CODE & FIX TO WRAPPING BUGS
+
+CLASS	oofTextDrawer
+Method	setFontSize   _Macintosh
+		- comment out the optimisation that returns early if (textSize==sCurrentFontSize)
+		  as debugging and dumping QD globals showed sometimes sCUrrentFontSize is out of
+		  synch with the Mac font size!!!
+		  
+Method	Invariant added (Mac imp only)
+
+oofTextSizer::describe
+		- added
+		
+oofPlotBits
+Method	ctor
+		- set initial paneRect non-zero
+
+
+oofRect::describe
+		- added
+						
+
+oofTransformationManager
+Method	describe
+		- added
+
+Method	setTickMargins
+		- always call setDrawRect, not only when dirty
+		
+Method	setDrawRect
+		TransformPoint
+		TransformRect
+		TransformVeLength
+		TransformHoLength
+		- add assert that non-zero
+		
+				
+add #ifdef'd debug dumps in
+- oofTextSizer::CalculateWrapping
+- oofBarGraph::finishConstruction
+- oofStackedBarGraph::finishConstruction
+- oofPlotBits::DrawSelf()
+- 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/10/26
+COMPATABILITY WITH LATEST POWERPLANT HEADERS FOR PRO6
+
+rename all PP types to match - new signatures, dropping old PP types	
+	Int8 -> SInt8
+	Int16 -> SInt16
+	Int32 -> SInt32
+	Uint8 -> UInt8
+	Uint16 -> UInt16
+	Uint32 -> UInt32
+	Char16 -> UInt16
+	Uchar -> UInt8
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/23
+FINISH BUILDING WITH PRO6
+
+CLASS	oofGraphWindow
+Method	CreateWindow
+		- use local var rather than writable temp for 
+		oofDrawStyleSetDefaultIteration
+		
+
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/08/17 MERGE DAVID'S OS/X AND PRO7 FIXES
+
+CLASS	CHandlePicture
+Method	DrawSelf
+		- conditionally use GetQDGlobalsGray to get pattern
+
+
+FILE	oofGrPP.cpp
+- conditionally include <UPrintingMgr.h> or newer <UPrinting.h>	
+  based on PowerPlant version __PowerPlant__	< 0x02118000	
+  
+CLASS	oofGraphWindow
+Method	DoPrint  
+		- conditionally use UPrintingMgr or UPrinting
+		
+Method	DoPageSetup		
+		- conditionally use UPrintingMgr or UPrinting
+
+Method	CopyToScrap
+		- conditionally use PutScrapFlavor
+		
+		
+CLASS	oofPlotBits
+Method	DrawSelf
+		- conditionally call QDFlushPortBuffer to force double-buffered update
+		
+		
+		
+#include <PP_Macros.h>
+#if !defined(__PowerPlant__) || __PowerPlant__	< 0x02118000
+	#define OOF_PRECARBON_PP_PRINTING
+#endif
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.4 PUBLIC RELEASE
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+		

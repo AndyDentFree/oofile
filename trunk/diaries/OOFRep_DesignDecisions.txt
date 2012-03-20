@@ -1,0 +1,3952 @@
+OOFRep Design Decisions
+
+See also OOFILE Design Decisions & OOFILE GUI Design Decisions
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/11/02 REPORT-WRITER AND SUPPORT CLASSES 
+The initial brief was for Ken to provide a simple columnar report-writer
+which took a list of fields and a primary table. It became clear that
+there was little sense in page dimensions being hard-coded inside his
+object. The issue of column widths is also a complex one - we decided
+it is more appropriate for them to be passed into the dbRep than to be
+calculated. If heuristics are applied to get the best looking col
+widths then this should be visible to the user, able to be overridden,
+and able to default to a standard width for all columns. This will
+require a small amount of extra work in the user interface but results
+in a much more usable product.
+
+Accordingly, I designed a page size object, which also contains the
+title, and a column widths object. This was initially part of the page
+size (dbRepSizer) but isolating it let me use a simple subclass of
+OOFILE_ExpandableLongArray and thus more readable stream syntax.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/10/03 NEW STRUCTURE
+
+Constraints on the basic model (for this version):
+- a report consists of sections that stretch across the full width of
+the report, or are limited to a single page width. We do not cater for
+parallel sections in a report. 
+
+- a similar model to the graph settings will be adopted - settings can
+be defined at a global level and overriden for a local report. 
+
+CLASSES and RESPONSIBILITIES
+oofRep
+- provide report settings object (maybe global default)
+- contain top level band
+- contain oofRepBandLists of page headers and footers
+
+oofRepBand
+- contain oofRepBandLists of headers and footers
+
+oofRepBandList
+- contain list of oofRepBand
+
+oofRepViewBand (subclass of oofRepBand)
+- contain a dbView
+- contain oofRepBreakLists of Before and After breaks 
+
+oofRepEnv
+- change the drawing environment state to a given style
+
+
+Processing the Report:
+- the pageHeaders and pageFooters lists are traversed, to sum the (fixed) band sizes, for future page height calculations.
+
+- the oofRep starts drawing the top-level band (immediately encountering a top of page state)
+
+- for a view band, the oofRep iterates across its headers, before drawing the band.
+
+- for each record in a view band, the oofRep iterates across its headerBreaks and footerBreaks (before and after) to see if any should be triggered
+
+
+Page Processing:
+- when breaking to a new page, the oofRep is asked to process a top of page condition.
+- oofRep::startPage draws any bands in the pageHeaders list
+
+
+Breaks:
+Break processing occurs before and after records, with the two lists for the band being traversed to see if any should trigger.
+
+The type of break governs the action taken:
+- page break
+- insert band
+- whitespace (trivial case)
+- subtotal
+- user defined
+
+A break 
+
+
+TEXT STYLES
+
+A band is a stylable object. If it doesn't have a text style, it calls the report settings to get the default text style.
+
+The default text style may be set for a report, or may come from the global default settings.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/29
+MAKE IT EASIER TO ADD GRAPHS TO REPORTS
+
+The following sequence of lines are currently used in RepTestApp to add a graph to a report. Apart from being clumsy for the user to add, they also assume a window is open and will have dire effects if not. They only work in RepTestApp because the report with the graph is the 2nd report opened.
+
+		oofColumnGraph *theGraph = new oofColumnGraph;
+		Rect theFrame={0,0,400,400};
+		theGraph->setPaneRect(theFrame);
+		theGraph->finishConstruction(&Sview, "\pTest Graph", 100);
+		theGraph->setDrawStyles(oofDrawStyleSetDefaultIteration());
+	
+		oofRepGraphBand* graph = new oofRepGraphBand(theGraph,400/*,400,500*/);
+
+
+The setPaneRect() and setDrawStyles() calls are fairly innocuous and can actually occur at any time - they are side-effect free.
+
+finishConstruction() is the call which does most of the calculation of the graph and MUST occur after the setPaneRect().
+
+Goals:
+1) allow the user to specify a draw style set but have default
+2) pass in the graph rectangle in the oofRepGraphBand
+3) eliminate all the above lines from normal use of graphs with oofRepGraphBand
+
+Decision:
+1) oofRepGraphBand can handle most of the above settings, as it already has the graph rectangle passed in. This implies
+
+2) there's a way to detect if a graph has had setDrawStyles called
+
+3) there's a once-off place at which oofRepGraphBand can call finishConstruction().
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b2d11 internal release 
+
+
+
+
+	
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/04
+HOW TO DECIDE TO PRINT HEADINGS
+
+See also discussion pertaining to views in OOFILE DESIGN DECISIONS.
+
+The current hard-coded logic draws headings on the main view band but not on any sub-bands (oofRepViewBand::drawColumnHeaders doesn't draw if on a related clone).
+
+Firstly, the test for if related is not satisfactory - the main band may be a view on a related table. Thus, we want to know if we are the topmost band or not!
+
+Secondly, we need a decision for topmost band by default that will be true, and a decision for nested bands that defaults to false. This implies two settings.
+
+	
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/08
+HOW TO VECTOR TO DIFFERENT DRAWING ROUTINES
+The report-writer rendering is determined by the environment passed in. An environment may wrap additional info such as a Mac page setup (PREC).
+
+We want to have a unique drawing routine for each drawable item on a report, for each environment.
+
+ALTERNATIVES
+1) Draw-time case on the type of the renderer. This has an attraction of simplicity but will result in a lot of cases being executed.
+
+2) Pre-draw-time case on the type of the renderer to create a drawing object. This saves a lot of testing for each draw and allows a simple drawing object to be attached to each report object.
+
+3) Use a virtual factory method in the multiple dispatch idiom of "Secrets of the C++ Masters" to perform 2).
+
+Note we can cut down on the number of objects created using a flyweight pattern. If the state is stored in the report items, they need only point at a reference-counted drawing object, rather than create one for each report object. (Question if this is worth the added complexity as there aren't *that* many items on a report!!!)
+
+DECISIONS
+For now, using shared drawing objects doesn't seem worth it as it might be convenient for them to be able to retain state, and the savings in memory are miniscule.
+
+Use a virtual factory method. Each environment has a set of MakeRenderer methods which take a reference of the type of the report object. In the FinishConstruction for the report objects, they each call 
+	mRenderer = env->makeRenderer(*this);
+
+(Query if we need to have the report objects descend from a common base to do this. I don't think so.)
+
+Note: the makeRenderer for Mac drawing vs Mac printing will return the same renderer, but this gives us the chance to later subclass for optimised printing etc.
+
+ISSUE:
+How do we pass specific info needed for drawing to the renderers, eg: a view from a view band? Does the ctor for the renderer end up with a pointer back to the object being rendered (the makeRenderer looks as though it could do this cleanly)?
+
+WHOOPS!
+Realised (whilst coding it) that the above approach is utterly wrong as it forces the environment to know about all report object types. When adding a report drawable type it should be our responsibility to make it renderable in all environments, hence have to swap the above responsibility by having oofRepSomeEnv::makeRenderer call a method on the report object.
+
+Now then, should we have a base type for all report objects?
+Certainly this is required for them all to point to a renderer, and simplifies the makeRenderer logic.
+
+However, if the base oofRepDrawable doesn't contain mRender then we can use specific types in each case, eg: an abstract oofRepPageNoBlock_Render which has an interface called by oofRepPageNoBlock and concrete subclasses such as oofRepPageNoBlock_MacRender. This avoids any downcasting and gives us a hierarchy of lightweight classes.
+
+
+97/01/15 Doubts
+This whole multi-rendering concept suddenly seems wrong. It struck me that we will have the same graph, say whilst displayed in a preview window, probably also print, save as RTF and maybe save as HTML. To be endlessly creating and destroying rendering objects seems a bit ridiculous.
+
+Going back to a case switch in each drawing call is equally unattractive for the reasons detailed above. For now I think we'll have to live with the minor performance hit of remaking the drawing objects each time. It is marginally more attractive than having these cached (which of course would easily be hidden within the makeRender methods!).
+
+
+97/01/19 WHOOPS! AGAIN
+(Moral, never do serious OOD whilst suffering the flu in a strange city)
+
+The basic tradeoff for who does the creation of backends is visibility:
+- if environments make renderers, they must know about all report objects
+- if report objects make renderers, they must know all environments.
+
+The latter *seemed* a simpler alternative, until I just realised the packaging division - we will be selling a Mac product which doesn't know Win environments and vice versa. (Thinking more about it, this is not true - they only need to know the environment as a forward declared class, not that it is a subclass of oofRepEnvironment or anything else. The compiler uses the different environment signatures purely to differentiate overloaded makeRender routines.)
+
+This is opposed to the force of allowing users to subclass - how can they make their subclassed report object known to the environment? The only mechanisms I know of involve runtime registries like PowerPlant's PPob parsing or the MFC Doc/View Templates. Thus, it is still simpler for a user to create their own renderers for each environment, or ignore them and have the base makeRender(xx) return a nil object.
+
+The decider is the open/closed principle. If environments make renderers they are not closed for extension, as they must be edited every time a new report object class is added.
+
+The final issue to solve then is how do we know when to create the renders?
+
+If a flag is used by the oofRep object, it can test at the draw() call.
+
+This may not be good enough for the renderers being called earlier to measure widths, but that is not a problem in OOFRep.
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/20
+CLONING REPORT RENDERERS & HOW THEY LINK TO THEIR REPORT OBJECTS
+
+The initial implementation has a render object pointing back to its owning (creating) report object.
+
+This runs into a problem with cloning renders - the copy ctor has to know the new report object (the assumption being a render object is cloned as part of oofRepDrawable::clone()).
+
+Solutions:
+1) pass the oofRepDrawable pointer into the render::clone(), with the clone downcasting the pointer into the appropriate type.
+
+2) don't have render objects point to their report object at all, but pass in the report object as a parameter to the draw() and width() calls etc.
+
+There is a secondary benefit to 2) which allows us to use reference counting and shared render objects, rather than having to clone them. This may be of doubtful benefit in future when we don't want shared renders because they retain state.
+
+The biggest problem with 2) is that passing the report objects as parameters prevents us using a single oofRepDrawable::draw() call as the default for most cases.
+
+Given the problems with 2) and the current state of code, it makes more sense to enhance the render cloning as in 1).
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/23
+SPECIFICS OF CREATING RENDER OBJECTS
+We can easily test at oofRep::draw() to see if the current environment is different from the last, and so we need to create new renderers.
+
+The difficulty is in propagating this down to the individual objects.
+
+One approach is for oofRep to have a draw() for each environment type, and to propagate the concrete reference down through the band lists (which have a makeRender for each environment etc.) and so on down.
+
+This results in a lot of very similar routines!
+
+A second approach is to have a generic oofRepEnvironment& passed down through the oofRep and the band lists etc. and at the bottom level have a double-call approach:
+- band calls oofRepEnvironment::makeRenderDispatch(this)
+- a virtual method makeRenderDispatch for each environment calls inDrawable->makeRender(*this) at which point we have a concrete reference.
+
+This second approach has a little more dispatching overhead but significantly simplifies the upper level code. For now, this tradeoff is acceptable.
+
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/25
+IMPLEMENT HEADER SUPPRESSION ON REPORTS
+
+Today's insight is that one simple way to express if a report requires headings drawn for nested views requires the report to know what level of nesting is the current view.
+
+We can later add an API for views to specify (Yes/No/Maybe) if they have headings drawn, but for now a simple setting drawHeadingsDownToLevel will do, with 0 implying no headings, and 1 being the default top level only.
+
+Note for later setting view-by-view, we really need a trinary logic. If the specific view doesn't care, then the report setting will be checked.
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/07
+FIX PROBLEMS WITH COMPLEX REPORTS AND MANY BREAK LEVELS
+The overall philosophy of the banded reports is that view bands are variable height and can handle their own pagebreaks, whereas other bands are fixed height and have simpler drawing logic.
+
+Thus every user of non view bands must ensure they have enough room to draw.
+
+A 5-level deep report at Mercator showed that we didn't that that assurance for bands drawn by breaks (oofRep::DrawBreakList).
+
+However, with breaks, there is an added complication that they may have triggered a page break already. We save up page breaks - a collection of breaks can only jump one page, so it makes sense that the page break still takes place regardless.
+
+Assume we have 2 breaks after a given view level, the cases are:
+A) the breaks don't specify a page break
+	A1) a break triggers a page break because it doesn't fit
+	A2) both breaks fit
+	
+B) the breaks specify a page break occurs after (all breaks processed)
+	B1) the first break triggers a page break because it doesn't fit
+	B2) both breaks fit
+	B3) the second break triggers a page break because it doesn't fit
+
+The most wasteful event is B3 which will draw a single break's band at the top of a page, then break to a new page. However this still supports the user model - if they wanted to force page breaks then we should always force a break!
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/21
+PRINT GRAPHS IN MONO
+
+The current printing of reports works in two ways - by a print environment and from a preview window. When we display a report in a preview window we create a series of pictures, stored in an oofram database. Thus, we draw our picts in colour (graphs) to get nice preview effects. Unfortunately when we print from this window we just print directly from the picts and hence print colour graphs.
+
+There are two user interface alternatives
+- have a direct print only print B&W graphs, and preview prints colour graphs
+- have a switch to enable B&W graphs
+
+The OO structure of report rendering works very nicely to our advantage here. We
+can have the printing environment used to create a different Graph renderer just
+by
+- overriding makeRenderDispatch in oofRepMacPrint
+- adding oofGraph::makeRender(oofRepMacPrint&) which will make a renderer that
+just sets the graph to mono before printing
+
+Note: unless we override this makeRenderDispatch for all other classes we get
+hidden virtal function warnings, but these are safe.
+
+A further minor problem cropped up - the current oofRepMacEnv has a render type
+but the subclasses don't. The render type is used by oofRep::draw() to decide to
+recreate the render objects for each report object.
+
+This requires further investigation in future - we don't want to recreate all the
+render objects if only one of them (or none!) is a graph. Maybe the generation of
+render objects should be decided at a finer-grained level than for the entire
+report?
+
+For now, we can add a render type to the MacPrint environment and the only major
+effect will be on printing Colour reports after previewing - it will regenerate
+unnecessarily. That's a fairly small price.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/25
+FIXING REPORT HEADERS & AVOIDING ORPHANS
+
+There is a bug in the report writer's current view band logic - no checking to
+see if the column headers fit. Also the column headers are drawn before header
+breaks are processed. This seems counterintuitive and user feedback indicates it
+is wrong - the only time Mercator used header breaks they set the header level to
+0 to disable column headers entirely.
+
+If we want column headers drawn after header breaks, the responsibility for
+drawing them should move into the viewband renderer (which currently draws them
+anyway on page overruns). The easiest way to accomplish this seems to be adding a
+flag in the view band renderer to say if the headers have been drawn on this
+page.
+
+The issue of orphans and headers are closely linked - we don't want to draw
+column headers and then break to a new page to draw the details.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/08
+
+RERUNNING REPORTS AND PROOFING AGAINST DATA CHANGES
+There's a bug or conceptual flaw in the way that Mercator are running many of
+their reports, that applies across the board.
+
+For any report directly on the main database (rather than a RAM database of
+summaries) you must not change the selection until the report is run. This
+includes before re-runs due to RTF export or B&W printing, and therein is the
+problem. The report-writer preview window is launched commonly by code which then
+restores the database context, so when Save as RTF is pressed the report pulls in
+the wrong data selection.
+
+As a general pattern, we consider the report a client of the data which wishes to
+remain independent.
+
+Any attempt to copy the data or use a different cloned table in part of the
+report runs into difficulties with the use of related tables or fields in other
+parts of the report.
+
+A very simplistic approach which will probably work for now is for the report to
+retain the selection used on the top band, and restore that selection every time
+the report is run.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/09
+ENHANCED REPORT FORMATTING - MINOR TWEAKS TO SATISFY MERCATOR IMMEDIATELY
+
+Background - short-term aesthetic improvement to Mercator's reports
+DESIRABLE
+- picture bands
+- font control including independent control of columns
+- set margins per band
+- alternate background shading horizontally and vertically
+- double line separators
+- varied borders
+- shading on blocks
+- graph enhancements
+  - fonts and sizes of text
+  
+
+
+IMPLEMENTABILITY
+General issues
+- need to finish Adorners - render model for Adorners?
+- check drawing modes
+
+
+- picture bands
+  - trivial copy of graph band
+  
+- font control including independent control of columns
+  - 
+- set margins per band
+- alternate background shading horizontally and vertically
+- double line separators
+- varied borders
+- shading on blocks
+- graph enhancements
+  - fonts and sizes of text
+  
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/01/29
+
+Seperating the adorners from the report writer renders to allow more specific
+drawing commands to be implemented. The problem was that the previous design
+forbid some of the necessary information passing for adorners at a base class
+level
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/02
+
+Moving OOF_mixAdornable from being mixed with oofRepDrawable to being inherited
+by it.
+
+Reason: All the adorners need at be called before and after the call to the draw
+function of the blocks and bands. Thus access is needed to the adorners at the
+oofRepDrawable::draw() level, not possible if it's mixed in rather than
+inherited.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/04
+
+Adding in a fixedWidth() function call to the base class oofRepDrawable (similar
+in all respects to fixedHeight())
+
+Reason: This will allow adorners to be attached to blocks without having it draw
+all the way to the left and right edges.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/04
+
+Moving oofRepTextStylable from being mixed with oofRepDrawable to being
+inherited by it. A similar move to that of OOF_mixAdornable.
+
+Reason: This will allow us to create a base function in oofRepDrawable which
+will return the text style of an object, facilitating calling it recursively to
+gain knowledge of all the text styles used in a report, as well as information
+used to calculate the amount of extra height or width used by an adorner.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/04
+
+Changing the draw call for the adorners to
+
+draw( const oofRepDrawable *) and drawcell( x, y, const oofRepViewBand *)
+
+so that it has access to the object's information. The default behaviour for
+drawcell is to call draw with the object so that it merely ignores which ever
+cell it's meant to be drawing.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/05
+
+The function oofRepBlockList::fixedHeight() makes the assumption that all
+block's height is based on the text style that is used. This is not the case for
+blocks such as PictBlocks, where the height is based on the size of the picture
+rather than the height of the text style attached. The text style attached is
+still important as this can be used to indicate the amount of extra shaded space
+above and below the picture with a oofBandShaderAdorner.
+
+To solve this problem, we'll make the default behaviour for fixedHeight in
+oofRepBlock the same as current, ie just return the height of the text in the
+attached style. And override this behaviour for blocks based on other numerics.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/06
+
+Overriding the draw virtual function from oofRepDrawable to oofRepViewBand so as
+to avoid the automatic calling of the adorners before and after the view is
+rendered. This is because the actual height of the table isn't known until the
+point at which it is rendered, besides, the table could be broken at the end of
+a page, to be continued on the next.
+
+The idea is to have the draw() function draw around the outside of the table,
+and the drawcell() function draw around each cell.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/09
+
+Passing the x/y coordinates to an adorner raised the question of whether the
+cells are refered to starting at 0 or 1. ie should the very first cell be [0,0]
+or [1,1]?
+
+Andy decided that it should be 0 based only as this would be consistant with all
+other array based objects within OOFile. Other frameworks (notably PowerPlant)
+mix in 0 based with 1 based classes which leads to more confusion even when it
+makes logical sense to have the change in to a different starting value.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/09
+
+The adorners need some way to detect whether a cell is at the edge of a table.
+The way I envision the border adorners drawing is that every cell draws it's
+left and top edge, all cells that pass lastCol() test draw it's right, and all
+cells that pass lastRow() draw it's bottom.
+
+Two functions were added to oofRepViewBand to perform these tests.
+
+// methods for the adorners to use to detect the edges of the tables bool
+lastRow( unsigned long row ); bool lastCol( unsigned long col );
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/09
+
+TO DO:
+
+oofBorderAdorner_MacRender::drawcell ( int, int, oofRepViewBand *, unsigned long
+height, unsigned long width )
+
+- height is height of cell - width is distance from the left hand side of the
+screen
+
+******** Future implementation should make width the horizontal distance of the
+cell
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/10
+
+Chopped borderWidth from oofRepEnvironment/Settings as behaviour now taken up by
+attached adorners.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/10
+
+TO DO: Investigate:
+
+When an adorner is attached to a Block, it's adorners seem to be drawn at the
+beginning of the layout band they are attached to. This will require some
+debugging time to sort out what is happening.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/02/10
+
+TO DO: Implement:
+
+fixed Height for adorners to add to the band or block they are attached to.
+Perhaps also added Width to be taken off the sides for bands, and added on for
+blocks?
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/03/20
+
+Add in a default parameter for the drawcell function so that overrun information
+can be sent. Coupled with this it will have 4 functions: drawTop drawBottom
+drawLeft drawRight which is controlled by the draw function. People can
+therefore override either the draw function if they wish to implement an adorner
+that is not side dependent (eg. shading adorner). Or if it is (eg. border
+adorner) merely override the 4 functions, and the original draw will be the
+logic which drives them.
+
+Addendum:
+
+After investigation this method will not work. The user wishing to override the
+adorner does so from the adorner class inherited from oofAdorner (ie
+oofBandShadingAdorner). None of there classes implements the drawing, as these
+are all inherited from oofAdornerRender, besides, since a different renderer is
+implemented for each platform, the user would need to override the drawing for
+each one. Thus they would essentially have to recreate the entire adorner, which
+negates the idea of having base adorners to override from in the first place.
+The solution then is to make the settings available within each adorner to be
+flexible enough to allow the user to set exactly what they want most of the
+time. Therefore the border adorner has seperate settings for each of the four
+sides of the border, so that a derived class from oofBorderdorner can set the
+parent's functions to perform the desired behaviour.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/03/22
+
+The default parameter for the drawcell function was found to have 4 states:
+
+start/stop - when the cell starts and stops on this page. start/continue - when
+the cell starts on this page, but continues on the next. continue/stop - when
+the cell started on a previous page, but continues on this one.
+continue/continue - when the cell started on a previous page, and carries on to
+the next.
+
+The default is set to start/stop, as this is the case for the draw and
+drawColumnHeaders functions. Only the drawOverRun function needs to use the
+extra setting to alter the cell drawing behaviour.
+
+The drawing code is also changed to draw for each setting:
+
+always - the left and right border
+
+start/stop - the top and bottom start/continue - the top continue/stop - the
+bottom continue/continue - none
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/03/23
+
+Removed unnecessary function from the adorner system.
+
+Originally there was 4 functions:
+
+draw( oofRepDrawable *drawable );
+
+draw( oofRepDrawable *drawable, unsigned long height, unsigned long width );
+
+drawcell( int x, int y, oofRepViewBand *drawable, AdornerCellCode
+overrunCode=startStop );
+
+drawcell( int x, int y, oofRepViewBand *drawable, unsigned long height, unsigned
+long width, AdornerCellCode overrunCode=startStop );
+
+The idea behind this doubling up of the functions was that some rendering
+platforms don't need height and width information (such as RTF, HTML and txt).
+But this was silly as they could just as easily be parameters that are ignored
+by those particular renderers. So these have been removed from the code, leaving
+just:
+
+draw( oofRepDrawable *drawable, unsigned long height, unsigned long width );
+
+and
+
+drawcell( int x, int y, oofRepViewBand *drawable, unsigned long height, unsigned
+long width, AdornerCellCode overrunCode=startStop );
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/11
+PAGE MARGIN SETTINGS IN WINDOWS
+Unlike the Mac, the user can edit page margins in the standard Windows
+Page Setup dialog.
+
+This presents us with somewhat of a conflict between the API for setting page
+margins and the user facility.
+
+We can update our global page margins by reacting to change in oofAfxDoPageSetup
+or just ignore the page margins in our oofRepSettings and allow the Windows GUI
+settings to dominate.
+
+The latter seems easiest for now, and most sensible from the user point of view,
+it will just surprise a programmer if they try setting page margins and see no effect.
+
+The main question then is how do we get the settings to the local page margins
+from the Windows setup.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/31
+COMMA-SEPARATED AND TAB-SEPARATED OUTPUT
+
+There were no design decisions recorded before adding this feature
+as the task was given to a junior programmer with what turned out to be
+inadequate supervision.
+
+This feature will be re-implemented later.
+
+The only design decision that appears to have been thought out is how to
+test the CSV compliance - being imported into Excel was the decider.
+
+The questions that should have been considered:
+
+1) How do people customise the separators?
+- consider that there is a huge degree of similarity between the two renderers
+- a single "separator" object could be supplied to output the separators
+  - needs to decide if it should put quotes around fields in CSV
+    - quote always
+	- quote strings always
+	- quote strings if contain whitespace
+- single separator would save on lots of makeRender factories etc.
+
+2) how do we handle multiple data sets in different bands
+- if related data, can we do a join on all columns
+- maybe user wants multiple files output so they can do their own external joins
+- how handle simplistic heading bands
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/06/22
+HANDLING MISSING PAGE DIMENSIONS
+
+>The fix we'd already worked out for Lexmark was observing that the paper
+>size comes back as empty, so we force default loading, ie: in oofRepWindow
+>ctor
+>
+> if (paperSize.x==0 || paperSize.y==0)  {  
+> 	pageSetup = 0; // will get system defaults
+> }
+> else {
+> 	ps.ptPaperSize.x = paperSize.x * 10;
+> 	ps.ptPaperSize.y = paperSize.y * 10;
+> 	ps.Flags         = PSD_INHUNDREDTHSOFMILLIMETERS;
+>
+> pageSetup = &ps;
+> }  // got valid paper size
+
+
+This workaround has an unpleasant side-effect - if paperSize is
+empty then the application defaults will be ignored. There should
+be a way how to get the paper size; there are two ways how the
+page size can be specified in PAGESETUPDLG. It can be either
+in dmPaperSize field as a symbolic value (DMPAPER_LETTER,
+etc.) or in dmPaperLength and dmPaperWidth. I've been using
+only the page size in tenths of millimetres. I'll try to write a
+enhanced version of the oofRepWinPrint::getPaperSize.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+ATTEMPT TO DEBUG NT PRINTING
+98/06/23
+
+Background:
+Under NT we had a major problem with printing in the past, where
+the metafile was drawn all over the place when printed and was
+significantly over the edges of the page on preview.
+
+There is a minor scaling problem occurring now which results in:
+- fonts being too large on NT
+- edges of bars not quite lining up with the axes.
+
+Investigation of initial page sizes showed data coming back from the 
+::DeviceCapabilities call in oofRepWinPrint::getPaperSize that was
+identical, within platform limits (ie: some flags differ that are 
+95-only).
+
+Further tracing showed that the LPtoDP in
+oofRepWinGUIPreviewMFC::setPageSetup was converting values differently,
+returning 950,672 on NT and 1123,793 on 95, for mPaperRect.
+
+Research on the net showed some comments indicating this may be a known
+flaw in NT/interesting behaviour. (Note: the ratio of around 1.18 is
+the same for both values and reminds me of the RTF graph sizing issues
+(Geoff later said it probably reminded me of the scaling we did to take
+screens to Win3.11!).
+
+However, just hacking the "correct" values in at this point did not
+improve things noticeably. The font sizes, for example, are already too
+large.
+
+Suggestions that zeroing data structures is of prime importance led me
+to test and I found that the printing structures were being zeroed with
+a sizeof(varName) instead of sizeof(STRUCTURE). In case this was
+triggering a compiler bug I changed them, so they also conform with the
+style used in the rest of OOFILE. This had no visible effect.
+
+Elemir suggested checking the mapping mode at the time of the LPtoDP but
+this proved to be as expected (MM_HIMETRIC).
+
+Calls to MakeInfoDC seemed to work and be called at the appropriate
+places.
+
+Looking at font metrics in oofRepWinEnv::heightOfTextStyle, the only
+difference was the MaxCharWidth (24 vs 26).
+
+
+ORIGINAL DESIGN DECISIONS SUMMARISED BY ELEMIR
+TO HELP WITH THE NT/CANON PRINTER DEBUGGING
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/24
+
+USING OF DEVICE AND INFORMATION CONTEXTS IN REPORT LIBRARIES
+
+The information context that is used for most of measurements is located
+in oofCurrentDraw class (static member variable sInfoDC). I have put it
+there to avoid creating and deleting of the info device context in all
+of the functions that use it. The limit for the number of info DC's is
+much higher than the limit for number of "real" DCs, so keeping of the info
+DC throughout all application's lifetime won't cause any problems.
+
+Using of the information device context in OOFile report libraries:
+-------------------------------------------------------------------
+
+calcCharHeight (oofGeoText, oofGeoLegend) - gets the font descriptor
+from the current font handle, creates the identical font, and gets its
+height as a cumulative value of tmHeight and tmInternalLeading fields of
+LOGFONT structure. This might be a possible source of problems. I think
+that keeping of the current font sizes in oofTextDrawer class, rather
+than recreating of the font every time we need a char height, might be
+a better idea.
+
+oofRepWinGUIPreviewMFC::changeTextStyle - use the information context
+for computing of the font height in device (screen) units. The computing
+formula has been taken from the Win32 SDK help, so it should be all
+right.
+
+oofRepWinEnv::heightOfTextStyle - uses IC for getting of the font height
+from LOGFONT structure. The function is similiar to oofGeoText::
+calcCharHeight, but it can use the current LOGFONT structure that is
+stored in the oofRepTextStyle class, thus making the function more
+reliable; there is no simimilar class in graphing engine, so the LOGFONT
+structure has to be fetched from the current font handle in
+calcCharHeight.
+
+oofRepWinEnv::getTextExtent - assigns the current font into our global
+IC and passes it into GetTabbedTextExtent API function.
+
+
+mhdcRef in oofGraphWindow and oofRepWinGUIPreviewMFC represents a
+reference DC that is used for transforming of the page rectangle into
+MM_HIMETRIC and is used as a reference device context for enhanced
+metafiles.
+
+
+Mapping modes:
+--------------
+
+oofRepWinPrint::setMappingMode(CDC* pDC) function sets the transforming
+mapping mode that enlarge the report outputs to match the printer
+resolution. It creates a local information context for screen and
+converts the page dimension from tenth of millimetres into screen
+pixels. Window extent is set to the page dimension in pixels and
+viewport extent is set into the printer resolution (in dots). The
+combination of extents and MM_ANISOTROPIC mapping mode in printer device
+context realize the transformation.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/25
+STREAM OUTPUT AND FILE CLOSES
+
+The various descendants of oofRepStreamEnv don't always close their
+files until you exit the application, depending on the RTL in use.
+
+We are deleting the stream in the oofRepStreamEnv dtor but this is
+probably not always closing the file. We need to explicitly hang onto
+an ofstream pointer and call close() on that. This can replace the
+mOwnsStream flag as they will indicate the same thing.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/28
+NT PRINT HACK FIX TO FONTS
+
+There are two major problems showing up with reports under NT.
+
+1) some minor artifacts appear with bar positions of graphs (with
+enhanced metafile only!). This appears to be a minor scaling issue as
+the overall report is a little narrower than the W95 print. However,
+I've not been able to find a point at which the relevant dimensions are
+different, dammit!
+
+2) Fonts are overall a size or two larger.
+
+Some hacking has shown that reducing the size of the lfHeight used in
+CreateFontIndirect will give fonts of approximately the size required.
+If we can apply this generally enough it may give acceptable NT
+behaviour for a first release.
+
+In a platform-specific manner (runtime, NOT compile-time), we need to cover:
+- getting fonts for measurement
+- getting fonts for drawing
+- fonts in graphs
+
+The whole issue of font management between the graphing engine and
+report-writer is somewhat messy. The graph classes tend to have the most
+low-level code.
+
+There is a strong temptation to clean all this up right now, but I don't
+think we have the time. For ease of the platform-specific adjustment, we
+just need to replace the ::CreateFontIndirect with our own, which can be
+a static method of oofTextDrawer.
+
+**** FOR LATER ****
+Analyse implications of rolling all font creation/selection operations
+into oofTextDrawer, to hopefully also gain caching.
+
+We also need a globally accessible way to get the runtime environment.
+This may be useful outside the bounds of the report-writer or graphing
+engine so should be available to users of the core database engine.
+
+There is a temptation to shove it into dbConnection as a static method,
+but we may want state information in future and more interfaces, so I
+think a new oofRuntimeEnv class is justified.
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/29
+REPORT TITLE ALIGNMENT SLIGHTLY NON-CENTRERED
+
+Whilst trying to debug NT printing, realised long-standing bug in layout
+band centring so fixed, was incorrectly halving left margin so appeared
+a little too far to the left. Only obvious when report title wide enough
+to be near borders. 
+
+This is Mac and Windows bug, although code differs slightly!
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/12
+MAKE MFC PREVIEW WINDOW MATCH MAC
+Black & White Printing Checkbox
+
+Overview
+The existing code for the report window uses a bitmap of buttons to create a
+toolbar consisting of buttons for the functions available while in preview mode.
+ The mac preview window has a checkbox for the black and white printing option,
+while the existing oofile code for mswin only allows for a push button for the
+same function.  We need to replace this button with the equivalent check box.
+
+Design
+We need to remove the existing button and then add a check box.  The removal of
+the button can be done at the resources level, while the addition of the
+checkbox can be done at run time.
+
+Implementation
+We need to create a new toolbar bitmap, one which no longer contains a bitmap of
+the 'BW' button.  This needs to be referred to in the file 'OOFRPRES.RC' as
+follows:
+
+#ifdef OOF_BW_CHECKBOX
+IDR_PREVIEW_TOOLBAR     BITMAP  DISCARDABLE     "res\\MToolBa2.bmp"
+#else
+IDR_PREVIEW_TOOLBAR     BITMAP  DISCARDABLE     "res\\MToolBar.bmp"
+#endif
+
+Note that 'MToolBar.bmp' was the original bitmap for the toolbar while 'MToolBa2.bmp' is the new toolbar bitmap.  Now we need to remove the button reference in the toolbar resource as below:
+
+#ifdef OOF_BW_CHECKBOX
+    SEPARATOR
+#else
+    BUTTON        ID_REPORT_BW
+#endif
+
+We replace the existing button with a separator, which we will need to resize and replace with a check box.  First though, we must add a check box control to the frame class in 'OOFREPMFC.H' in the oofRepPreviewFrame class (protected member):
+
+#ifdef OOF_BW_CHECKBOX
+	CButton		mBWCheckBox;
+#endif
+
+Now that we have a member, in the class's OnCreate() method we can add the code
+(in 'OOFREPMFC.CPP'):
+
+#ifdef OOF_BW_CHECKBOX
+	// width=170, height=30 - TODO, calculate the proper sizes...
+	m_wndToolBar.SetButtonInfo(5, ID_REPORT_BW, TBBS_SEPARATOR, 170);
+	CRect rect;
+	m_wndToolBar.GetItemRect(5, &rect);
+	rect.bottom=rect.top+30;
+	mBWCheckBox.Create("Print in Black && White", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, rect, &m_wndToolBar, ID_REPORT_BW);
+#endif
+
+This associates ID_REPORT_BW with button 5 (note that we must do this since the
+replacement of 'BUTTON    ID_REPORT_BW' with 'SEPARATOR' no longer does this)
+and sets the width of the separator to a value large enough to fit the check box
+and it's caption.  The choice of width 170 and height 30 is arbitrary and looks
+good on the pc/nt platform, but is this cross platform?  Possibly not, depending
+on whether it is in dialog units etc.  This needs to be confirmed, or some
+procedure found to automatically determine the size.  The size of the check box
+control is then determined and then it is created with the toolbar as the
+parent.
+
+This uses the same tooltips etc as the old button, and hopefully this approach
+is minimalist and portable.
+
+Implications
+For the user of oofile to have the check box instead of the button, they must
+define OOF_BW_CHECKBOX before the three files are compiled, ie in their stdafx.h
+file or equivalent, or else they could define it in a universal oofile header
+file if they wanted it permanently in a build with oofile (note that none of
+these three files go into oofile libraries, they are referred to directly by the
+application using them).  There is a possibility that the sizes associated with
+the check box may not be correct for all mswin installations, depending on the
+context of the sizes (dialog units or pixels).  This needs to be confirmed.  The
+change in code is minimal, but will need to be tested.
+
+The new files 'MTOOLBA2.BMP', 'OOFRPRES.RC', 'OOFREPMFC.H', 'OOFREPMFC.CPP' are
+all in your transfer folder in the folder 'MIKE'S CHANGES'.  You might like to
+do a file difference to confirm and locate the changes.  Each code change is
+wrapped in '//man MD', '// end man' and before each '#ifdef OOF_BW_CHECKBOX' is
+a '#define OOF_BW_CHECKBOX' to force the change, if you just add a define to
+stdafx.h, you will have a big build to watch!
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/12
+CHANGE MFC PREVIEW TO ALWAYS APPEAR MAXIMISED
+
+This may appear trivial but working out where to apply the maximized style is
+not.
+
+Working on the assumption that the frame window is the one to maximise, the
+obvious places to try are:
+- in oofRepPreviewFrame::PreCreateWindow - play with the CREATESTRUCT's style
+- in the call to LoadFrame from the function ooAfxCreateReportView
+
+Neither of these made any difference. When tracing oofAfxCreateReportView, it
+calls CFrameWnd::InitialUpdateFrame which then calls ActivateFrame with -1.
+From the documentation on ActivateFrame, the correct approach if we want the
+report window to default to other than the SW_SHOWNORMAL state is to override
+ActivateFrame.
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/26
+CHANGE PAGE DRAWING AND ADD ZOOMING CAPABILITY
+
+A lateral shift appears required to make NT behave, which gives us the chance to
+make the necessary drawing changes to have zooming in Windows.
+
+We will try different drawing modes - old metafile uses MM_ANISTROPIC mapping
+mode, new metafile just computes actual page size and uses it for output.
+
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/01
+GETTING PAGES TO PREVIEW
+
+The current design's metafile-based process is roughly:
+- the report window creates an oofRepEnvironment (oofRepWinGUIPreviewMFC)
+- the oofRepWinGUIPreviewMFC creates metafiles for each page and adds them
+  to the dbRepPICTS owned by the report window. This is by the
+  startPage/endPage processing called from the report as it draws.
+- printing and previewing are both based on playing back a metafile for 
+  a given page.
+
+As noted elsewhere, metafile playback is very unreliable under NT. In
+particular 
+
+The new process therefore needs a way to draw a single page, based on
+cached information (pre-evaluated page breaks at least), without using
+metafiles.
+
+The preview window and printing environments have access to a dbRep* but
+there is a certain attraction in mirroring the existing model. Instead
+of recording drawing opcodes, our GUI renderers can create higher level
+objects that are graphs, text blocks, space bands, line bands etc.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/01
+PAGE-ORIENTED PROCESSING VS EDITABLE CELLS
+When we later implement the editing of cells in a view, it seems fairly
+clear that the only acceptable behaviour will be to edit all of the cell
+content in one hit, rather than just the visible portion of a split
+cell. 
+
+This is easily proven with the counter-example. If we have 2 lines of a
+cell visible at the bottom of a page, and choose to edit that, on exit
+from adding a couple of extra lines our new lines would be immediately
+kicked over to the next page because they don't fit - implying they were
+never saved. 
+
+Thus, the interface for editing must be able to access the report-data
+at a view level rather than a page-oriented chunk level. 
+
+This can be independent of our page drawing so our page drawing doesn't
+need to be based on objects that span page breaks. The renderers will
+also be usable later for the editing interaction, so there will need to
+be some two-way relationship or at least rendering object relationship
+back to original view. 
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/01
+DRAWING WITH ROWS OR GRIDS
+If we are to provide a facility to draw a page at a time, which seems
+well established above, then there is a decision for how viewBands are
+drawn particularly for those that have been split over the page break. 
+
+Is it best to create a number of row-rendering objects, containing
+low-level text objects etc. or a single grid? 
+
+At the grid level is the property of the titles of the grid columns,
+assuming they are enabled. The grid may also make drawing borders
+simpler.
+
+For rows, cell management may be a lot simpler particularly if the
+number of columns per row varies.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/01
+MULTIPLE REPORT PROCESSING
+
+If we consider multiple reports as just a way to tack reports together,
+then the only difference between drawing an individual oofRep within an
+oofRepMulti and by itself is the start and finish of the environment.
+
+The environment start and finish calls are from within oofRep::draw so
+we can subclass to create an oofRepSection that overrides only this
+method.
+
+This makes oofRepSection a very simple subclass in that it still needs
+all the attributes of oofRep.
+
+The report adoption process in oofRepMulti::appendReport therefore is
+not much more than a copy ctor, however it needs to transfer ownership
+of the owned pointer members of oofRep, or we need a reference count.
+
+Adding a reference count to oofRep, and implementing a copy ctor for
+oofRep that increments this, is flexible and allows for constant rhs
+params.
+
+The oofRepSector copy ctor therefore will simply use the parent oofRep
+copy ctor. 
+
+The alternative requires that the rhs always be writable, and that we
+adopt pointer members explicitly. There are no reasons supporting this
+approach.
+
+DECISION: - use copy ctor with ref count.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/07
+DRAWING WINDOWS REPORTS WITHOUT METAFILES - MAIN ARCHITECTURE
+
+This is partly a step toward the new 'r2p' architecture, but
+urgently we need a way to draw reports that doesn't rely on
+metafiles for onscreen drawing. This decision is the result
+of hundreds of hours invested in debugging NT printing, without
+improvement.
+
+Behaviours to support:
+- copy a page to clipboard as a metafile
+- preprocessing of pages in the oofRep::draw() method gives us
+  a set of cached pages in some representation
+- switch between drawing graphs in mono and colour
+- goto arbitrary page in preview
+
+Following the picture metaphor:
+The current approach creates a database of PICT or metafile objects
+in RAM, created in the startPage call for GUI environments.
+
+If we want to create an analogue to this, we need a set of
+primitive drawing objects created, and grouped together for a page.
+
+The simplest possible primitives we need are
+- draw a line (different styles, esp. page borders?)
+- draw styled text in a single line
+- draw a graph
+
+Copying page to clipboard:
+We can implement drawing to a metafile from our new page 
+drawing, but the simplest approach would be to keep the current
+drawing, which creates a database of metafiles, in parallel with 
+creation of the page objects. This means the copy logic remains
+identical - a big saver in debugging. The trade-off is increased
+overhead at report creation time, which is acceptable only for the
+immediate future.
+
+DECISION - keep old drawing in parallel for now, implement as 
+drawing to metafile in near future.
+
+
+
+CHANGED BEHAVIOURS
+- add drawing primitives
+- create drawing primitives in renderers
+- create & manage pages in oofRepWinGUIPreviewMFC
+- draw page in oofRepWindow::OnDraw instead of playing metafile
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/07
+DRAWING WINDOWS REPORTS WITHOUT METAFILES - TEXT STYLES
+
+We can choose to capture text styles either
+- per text object
+- as an event in the stream of drawing objects.
+
+Capturing per object has a high storage overhead and requires our
+output logic to do a lot of comparisons to determine if it should
+change styles (remember that a text object at present is a single line,
+not a block).
+
+Capturing as an 'event' means we are only making as many changes as
+occurred in the original drawing and cuts down on the storage overhead.
+It also has a nice independence - we can just store another oofDE 
+without the text rendering knowing of it.
+
+DECISION - store as events
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/08
+DRAWING WINDOWS REPORTS WITHOUT METAFILES - OTHER GRAPHICS
+
+Things we need to record for the incidental graphics - shading,
+lines etc:
+	FillRect calls in
+	- oofShadingAdorner_WinRender::draw & drawCell
+	- oofShadingAdorner_WinRender::draw & drawCell
+	- oofRepLineBand_WinRender::draw
+
+	LineTo calls in
+	- oofBorderAdorner_WinRender::drawcell
+
+
+oofRepWinGUIPreviewMFC::drawPageBorder
+can probably just be called directly. It uses FrameRect calls.
+
+oofRepGraphBand_WinRender::draw calculates a rectangle and draws a
+graph. We can copy the graph (in case runtime logic recalculates) which
+includes its own data.
+
+All the above are objects drawn in a rectangle, so we need to extend the
+oofPositionedDE to oofSizedDE which also records the bottom,right pair.
+
+The main issue to be cautious of is what params can be copied and what
+are local handled (eg: colorref vs HBRUSH) which we need to recreate at
+drawing time.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/08
+DRAWING WINDOWS REPORTS WITHOUT METAFILES:
+REMOVE INAPPROPRIATELY CENTRALIZED RECORDING
+
+We don't want to record ALL textOut calls as text elements
+as that stuffs up graphs.
+
+The reason for centralizing calls in the first place was that it seemed
+a much easier way to go. However, I realized that the graph drawing
+uses the same calls, but we are drawing graphs directly in the new mode
+rather than via the recorded calls, so need to record externally.
+
+				
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/13
+FIX WINDOWS PRINT BUGS - SHRUNK COLOUR PRINT
+
+Prints using colour were being produced at a drastically reduced
+size on a 300dpi laser. Investigation of code showed that the colour
+prints were being routed through 'normal' windows printing, because in
+the previous metafile-based approach the existing content of the window
+could just be redrawn.
+
+With the new direct drawing of report pages, the standard Windows print
+was not being scaled for the higher resolution of the printer and there
+is no reason to draw differently - we don't have a cached metafile.
+				
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/13
+REMOVE METAFILE GENERATION IN WINDOWS REPORTS
+
+To simplify Windows report drawing, before revising the font drawing,
+the current metafile approach can be removed. The only reason for it 
+being left in was to provide metafiles for copying a single page to the
+clipboard. This can be much more efficiently provided (later) by
+redrawing the requested page to a metafile only when demanded.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/13
+REMOVE WINDOWS RESOURCE LEAKS
+
+The problem is that too many sources manage their own contexts and
+fonts. We have centralised font setting in oofTextDrawer::selectFont and
+I think this should manage the current font.
+
+This means, if we change the current DC, that oofTextDrawer must be
+notified to cleanup the current font.
+
+In particular, the graphing engine makes a number of messy calls and has
+duplicate code in oofGeoText and oofGeoLegend.
+
+The report-writer has more centralized logic but we must remember that
+the graphing engine can work in isolation. The central point is the pair
+of utility classes oofTextDrawer and oofCurrentDraw.
+
+We want to stop retaining any idea of a current font in other classes.
+
+Responsibilities:
+- selecting a font into the current IC and DC
+- deleting the current font when a DC goes away
+  (implies deselect in both)
+- return a charHeight for a given text size
+- changing the current font size
+  (implies possible creation of a new font)
+  
+Recommendations:
+- add calcCharHeight and setFontSize to oofTextDrawer
+- add cleanupFont to oofTextDrawer
+- oofCurrentDraw::setCurrentDC to call oofTextDrawer::cleanupFont when
+  the DC is set to nil
+  
+  
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/15
+FIX PREPASS OVERWRITE ON WINDOWS
+The drawing code which used to be captured to a metafile now
+causes visible drawing before printing or the page preview.
+
+We want to prevent this in a temporary manner, until the full
+preprocessing measurement is implemented.
+
+As these drawing calls no longer need to be captured to a metafile,
+because of our explicit **DE::recordElement(), we can simply comment
+them out for now.
+
+Note: when commented out style call in - oofRepWinGUIPreviewMFC::changeTextStyle
+had problems with incorrect font width on redisplay of report.
+
+
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/15
+FIX REFRESH WITH WRONG FONTS AFTER PRINTING
+
+After printing from the preview window, the wrong fonts are used to draw
+text in the reports and graphs, and the graph measurement of heights
+(which is recalculated I think at draw time) is all wrong.
+
+The problem is that the measurement pass before printing recalculates
+all the drawing elements and styles, but there is no repeat of the pass
+after printing (to refresh the screen).
+
+The initial draw to recordElements is in report window creation:
+oofRepWindow::CreateReportWindow.
+
+The report is redrawn from oofAfxPrintReport.
+
+This means we are drawing with a different set of report elements, but
+somehow the recording of the second set is corrupting the fonts used in
+the originals, or having some other effect on the drawing environment.
+
+I wonder if it is related to the effect I noticed that unless
+drawWithTextStyle was called in the preparation, the elements had
+incorrect fonts used in measurement.
+
+However, remember that we are not remeasuring so it's purely a drawing
+artifact.
+
+IMPORTANT POINT
+It's not the recording of extra elements but the act of printing. If the
+printing is cancelled then there are no problems.
+
+As lines are still drawn in the correct places, and the initial position
+of styled text is correct, I assume that the scaling and geometry of the
+page is unchanged.
+
+RESULT OF RESEARCH
+Instructions - breakpoint and examine the LOGFONT in the style owned by
+the oofWinTextStyleDE used before and after printing.
+
+Result - observed it falling to zero height, which defaults to 12 point.
+This was due to the Info DC being managed globally and cleaned up in the
+print env dtor.
+
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/28
+WINDOWS RESOURCE LEAKS
+The leaks appear far worse when printing reports with graphs, and the
+leaked data contains fragments of font names etc.
+
+The main places we allocate patterns which are leaked are in the
+oofDrawStyle objects. There are two issues here. Firstly, a trivial case
+that if local settings were used for a report then it didn't delete them
+so any styles set there were leaked.
+
+The main issue is the nature of Windows object deletion - if we select a
+brush into a current DC then we can't delete the brush.
+
+LATER - this doesn't seem to be a problem, once leaks with parent
+objects were solved we appear to be deleting all Windows objects.
+Testing with Win95 to follow to ensure that BoundsChecker isn't making
+wrong assumptions that DeleteObject has accomplished a delete.
+
+		
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/02
+FIX LEAK OF GRAPHS IN REPORTS
+
+Extensive testing with BoundsChecker reveals major leaks in graph bands,
+now that the other sources of leaks have been removed.
+
+On examination of user code from KIDMAP and our sample reports, the
+expectation is that the graph band adopts the graph, passed in as a
+pointer. This matches the pattern of similar report bands but is NOT the
+case (note that the mGraphPtr member was not commented as //owned).
+
+
+		
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/18
+EXTEND FIELD BLOCKS TO ALLOW BRACKETING TEXT
+
+A user has made their own extensions to allow specification of text
+before and after the field block.
+
+The main reason was the ability to only have a single block centred or
+right-aligned in a layout band and so their wish to have a field with
+text before it, right-aligned, was only possible via this extension.
+
+The current rendering of the similar field, pageNo and text blocks is
+bloody silly as individual renderers know about these classes as one or
+more strings. If the other two classes are all made subclasses of a text
+block with virtual member to supply a string, then a single renderer can
+be used for each environment with string concatenation being used at a
+high level rather than whilst drawing.
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/08
+COMPLETE MIXING PICT AND TEXT BLOCKS IN LAYOUT
+
+When the sample was changed to mix text and pict blocks it became
+obvious that there was a problem assumption in the layout rendering.
+
+Originally a layout band contained only text blocks of some kind, all of
+only one line high. The drawing code took the shortcut of moving down to
+the baseline of the font for drawing purposes, rather than drawing along
+at the top of each band's row. (A row in a layout is a series of blocks
+terminated by a block with moveDownAfter set.)
+
+This meant that picture blocks were being drawn too low by the font
+ascent.
+
+As a clarification of responsibility, each block is responsible for
+maintaining the current position at the height entered (which the layout
+band sets to be the current vertical position on the page). Thus a
+picture block will be drawn below that position. A text block will move
+down by the font's ascent, so it draws just below that line, and move up
+again on exit.
+
+Remember that the situation is complicated slightly on the Mac by
+relying on the Quickdraw variables that maintain the current position,
+and hence heavy use of Move rather than the absolute MoveTo.
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/14-15
+FIX HEAVY RESOURCE CONSUMPTION WITH GRAPHS IN WIN95
+
+Under Win95 you can only print about 100 graphs in a single report before running
+out of GDI resources. This is not a resource leak at a report level as all the
+oofDrawStyle objects which consume the resources are cleaned up, but simply due
+to too many of them persisting for the life of the report and consuming GDI
+resources all that time.
+
+The problems were identified loosely by Mercator and in detail by Eugene
+Vernikovsky. They have since been confirmed by extension of the sample reports
+program to include a lot of graphs.
+
+There are three possible approaches:
+1) Shared Resources
+- oofPattern and oofDrawStyle will hide sharing of Windows resources, managed by 
+  a central pool
+- the lookup from the central pool will be a factory returning a suitable 
+  resource on demand
+
+2) Create/Release
+- current approach but the call to retrieve the Windows resource creates it
+- explicit call to release the Win resource added, all clients must call
+
+3) Factory/Consume
+- like 2) the call to retrieve the Win resource creates it, but is a factory 
+  that doesn't retain ownership
+- caller must destroy the Win resource when it finishes with it.
+
+The appeal of 1) is that it is totally transparent to any client code, including
+that possibly in user extensions to OOFILE or indeed their own applications.
+
+Implementing either 2) or 3) increases the chances of leaks because of the
+explicit cleanup required. There is little to choose between these, other than 2)
+offering the possiblity of smarter cleanup (ie: not always releasing).
+
+The main disadvantage of 1) is the increased cost of lookup when patterns, pens
+etc. are created from the central pool. This should be fairly minimal compared to
+the cost of recreating Windows objects all the time in 2) and 3). There is an
+outside chance that the range of objects used in 1) might be so different as to
+amount to a significant drain on resources anyway, but that seems unlikely.
+
+Option 1) also allows user code to make use of these central pools which could be
+a significant benefit to some users.
+
+DECISION - option 1) is safest and offers the most benefits, but may be slightly
+more work to implement.
+
+MINOR COROLLARY
+Should we have the current classes that use the HBRUSH and HPEN types directly
+use the central dictionaries, or use oofPen and oofBrush classes to hide them?
+
+If we use lightweight envelope classes to hide the allocation and reference to
+the central dictionary, then future versions can choose to avoid use of the
+dictionary. (eg: an NT version or runtime might retain Pens locally etc.). These
+classes can use casts and can later be used directly in user code.
+
+There is no apparent benefit in storing an index and having to refer to the
+dictionary directly.
+
+DECISION - write wrapper classes oofPen and oofBrush.
+
+
+DICTIONARIES
+There are several ways to store the central representations for Pen and Brush.
+
+a) array of objects with the envelope Pen objects referring by an index
+b) array of pointers to objects, with envelopes using an index
+c) array of pointers to objects, with envelopes also pointing to these objects
+
+We want to optimise both the retrieval of the Windows objects and the scanning of
+items to see if they match.
+
+Option a) gives the fastest scanning. If we combine that by locally caching the
+HPEN or HBRUSH in the oofPen & oofBrush objects then we achieve both aims.
+
+DECISION - option a) plus local caching
+		
+		  
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/11
+FIX WINDOWS NT REPORT SCALING WITH SCREEN RESOLUTION
+USE 72dpi INTERNALLY
+
+The problem was characterised as, within NT, changing screen resolution changed the
+size of printouts - the report size varied and fonts were created incorrectly.
+
+Reports at screen resolutions of 1024x768 or higher seemed reasonable, although
+varying in ever-smaller fonts. Lower resolutions crashed and didn't fit.
+
+After much investigation, an anomaly was found in the way NT behaves in the
+values from GetDeviceCaps. The LOGPIXELSY value is always 96dpi (matching the Win95
+illusion that we always have 96dpi). However, looking at the actual values being
+used in scaling mapping modes such as HI_METRIC, Win95 returns 96/2540 where NT
+returns screen width (eg: 800)/32000 (screen physical width in 100th mm's).
+
+Whilst in this research I realised that there was a fundamental flaw in our thinking
+as page boundaries etc. were applied. All the external interfaces to the report-writer
+assume points are 72dpi. Thus we had logical page rects (nominally at 96dpi)
+having margins of 20pts at 72dpi deducted. (Note: Mercator staff had been quietly
+#ifdef'ing different values and working out Windows margins empirically without
+this receiving the publicity as a cross-platform bug that would have alerted me
+months earlier!)
+
+Two alternatives thus presented themselves
+1) convert incoming values in our settings into Windows logical values
+
+2) work internally at 72dpi.
+
+Option 1) is complicated by the fact that much of the logic under this 72dpi
+assumption is not in the platform-specific renderers, although a prepass by a
+renderer could be inserted in oofRep::draw that would affect the settings.
+
+The biggest argument against 1) is that the margins etc. would then vary in our
+settings according to the rendering environment, which would complicate debugging
+and introduce the chance of other bugs (eg: view in Windows then save as RTF).
+
+Thus option 2) was adopted, to work internally in 72dpi. This involves removing
+the scaling of font sizes up (compensating for 96dpi) where fonts are allocated
+or sizes calculated, and changing the mapping modes of both the IC and DC so that
+the logical size is always 72dpi.
+
+		  
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/23
+FIX PROBLEMS WITH MULTIPLE BANDS AND GRAPH SIZING
+
+Mercator experience problems with some of their view footers which combine space
+bands with graph bands. The changes to force graph bands to scale to body height
+are not sufficient because the combination of leading space band and large graph
+band still causes a page break.
+
+In additition in other circumstances graphs are being drawn on a subsequent page
+when there would be room for a reasonably aesthetic graph, slightly shrunk from
+the specified size.
+
+User evaluation of the sizes is not possible as they cannot hook into the report
+rendering process at this point.
+
+Conclusion - the report-writer must be smarter about grouping bands together and
+allowing for scaling down of graph bands.
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/26
+IMPROVING GRAPH SQUISHING
+The original intent of being able to specify the graph band
+height in a report independent of the graph size was so you
+can have a graph easily centred within a space.
+
+At Mercator people tend to use space bands on either side
+to accomplish this, so we've had to make a bandList able to
+keepTogether, and able to fit in a lesser space.
+
+This means at one point (say on a change to Landscape) we are
+shrinking a graph band to fit, but later want to make its height
+return to the original, to keep the centring effect.
+
+Resetting mHeight after adjusting the height doesn't work because
+the later call to draw centres within the original height.
+
+Thus, mHeight needs to be squished when necessary and we need an 
+extra member to retain the original specified height.
+
+We also need a point at which this can be called. FinishConstruction
+is not called on resizing and forcing it to be called at this point
+could cause all kinds of side-effects.
+
+The main problem is that a report drawing a band doesn't know that the
+band has been adjusted, and the band doesn't know when the adjustment is
+no longer valid.
+
+The mHeight member returned by the virtual fixedHeight() method is used
+by two clients. It is used by the oofRep::drawBandList like other band
+types to calculate how things fit (thus returning an upper bound).
+
+It is used within the graph rendering to provide the band height in which
+we centre the graph.
+
+A pragmatic fix for now would be to store an additional member for the 
+current drawing band height, which we scale, and retain the original 
+mHeight as the specified height. This keeps the public interface working
+the same and restricts the scope of the fix to within the graph band and
+its renderers.
+
+Decision:
+- store extra member for graph band and renderers to use,
+  with getter drawingHeight()
+  
+Corollary
+- we also need to save the original specified graph height & width
+  as we adjust these when we scale.
+  
+-----
+
+A minor aesthetic issue is the previous squishing assumption that we
+should scale a graph proportionally. Due to the internal allocation of
+space to the fixed width legend and Y titles, this results in very poor
+graph drawing.
+
+A better approach is to recognise the change in aspect ratio, and at some
+future date be smarter about spreading out titles and legends so they can 
+wrap onto fewer lines, whilst preserving the aspect ratio of the internal graph
+area to some degree. If we start out with wrapped Y axis labels, a squished 
+graph will look even worse!
+
+		  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/08
+COPE WITH DIFFERENT TABLE RENDERING AND NEED TO WRAP HEADERS/FOOTERS 
+
+The XML implementation showed that sometimes a view band renderer needs to 
+have a start/end method bracket called OUTSIDE the headers, where the other
+renderers so far have been inside.
+
+David implemented a clumsy method where there was a state flag set in the
+report, by the environment. This made oofRep::DrawViewBand hard to read as it 
+was not clear why the state was being set.
+
+It is cleaner to maintain the start/endTable approach but use two more
+virtuals. Renaming the current start/endTable to start/endBody makes
+their purpose clearer.
+
+Picking a name for the outer calls, we want to emphasise that they are 
+enclosing ALL output to do with the table. Hence nouns such as Wrapper,
+Container or Enclosure are candidates.
+
+DECISION
+use start/endWrapper as it's shorter and avoids confusion with possible other
+uses of Container.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/11
+MOVE XML REPORT LAYOUT & CSS PARSING OUT OF DRAW
+
+We need to have the layout and style creation occur ONCE for the report, 
+where the draw routines are called many times as we move through the data.
+
+The initially attractive location for this parsing is a minor overload of
+finishConstruction. However, this starts mixing the purpose of classes.
+
+
+ALTERNATIVES TO FINISH CONSTRUCTION
+1) use finishConstruction
+2) walk the tree separately with other explicit call
+3) put the extra code in the renderer ctor's
+
+ISSUES
+1) use finishConstruction
+The report calls finishConstruction for a once-off completion of report
+object definitions, after all definitions have been created.
+
+If we maintain the principle that the report objects (ie: oofRepDrawable
+subclasses) are essentially declarative - defining the report, whilst the
+attached renderers draw the report, then using finishConstruction is
+a violation.
+
+There are also dangers with objects like the graph which may suffer side-
+effects from repeated construction.
+
+Considering that the environment manages rendering, it is the obvious class
+to manage this environment-specific task.
+
+
+2) walk the tree separately with other explicit call
+This is conceptually clean - let's have a separate traversal for the 
+separate activity of parsing layout & CSS styles. It is complicated by
+the issue of exactly HOW do we call the logic in the renderer - we want
+to add a method to an implementation hidden behind an abstract interface.
+(Note: the PLOP3 book has Extension Object pattern which could help).
+
+
+3) put the extra code in the renderer ctor's
+This would be very straightforward and seems reasonably safe.
+It is slightly dangerous from a conceptual design point of view as it is mixing
+pure construction with parsing that expects more external context. (eg: what would
+happen if construction occurred in a different order to the normal tree).
+
+Note that it is safe to have a report re-run to XML with this approach as 
+we only need to calculate the styles and layout once.
+
+
+DECISION
+Use 3) but with warning in oofRep::Draw to maintain the order of calling, as it
+involves far less work than any other approach and the risk is fairly small.
+
+
+-----
+
+If we are not overloading finishConstruction we need a separate way to
+walk the report tree. It is not hard to walk the report tree externally.
+
+It would be cleanest to pull the logic out that walks the tree calling
+finishConstruction and make this a visitor. The alternative is copying
+the finishConstruction walking code 
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/12
+CUSTOM DRAWING FOR VIEW COLUMNS
+
+We need to provide a way for a plugin renderer to draw alongside
+the other columns.
+
+This plugin interface should make very few assumptions about the nature
+of the renderer and what state we retain on its behalf, even if this
+forces extra work for the plugin author.
+
+Plugins might be for formatted text (eg: Led), pictures, graphs or some
+calculated content.
+
+The model where plugin output fits entirely within a page is simple -
+we need to know the height taken up by the plugin so supply it a 
+width within which it can wrap or otherwise calculate its height.
+
+If the field is passed into this call from the dbView we avoid any
+dependency on initialising the plugin with a given field and problems
+with cloning of views.
+
+For page break handling things get a little more complicated.
+
+The current model assumes a fixed height is pre-calculated and consumed
+as we go through a set number of same-height rows.
+
+ALTERNATIVES
+1) keep the fixed height/consumption model
+
+2) allow a calculation call to the plugin to vary the height remaining,
+   in case it needs to keep extending.
+   
+There is almost no appeal for option 1) other than a small amount of
+simplicity in retaining existing logic.
+
+Option 2) allows for a wider range of plugin behaviours and caters for 
+subtle points where a plugin might be a few pixels higher than the 
+truncated rows alongside.
+
+DECISION - Option 2.
+
+   
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/21
+CUSTOM DRAWING FOR VIEW COLUMNS IN MFC
+
+On the Mac, regardless of how a user-wriitten custom drawing routine works,
+it will be captured in the PICT recording which is then used for display in the
+preview window and printing.
+
+On the PC we moved to our own metafile-like recording of draw objects to
+get around problems replaying metafiles on NT.
+
+We thus need a way for custom drawing routines to supply an oofDE object
+for each page.
+
+To make life easier for the OOFILE user this shouldn't require too much more
+work than the original custom drawer. 
+
+The obvious approach is to provide a DE which wraps any custom drawer and 
+calls it with the appropriate values in sequence, as if it were being invoked on
+the Mac. This means that some work is being repeated at drawing time, having
+invoked calculations to decide if the custom area fits and then re-invoking them
+at page refresh time. This seems a reasonable trade-off for simplicity.
+
+The only alternative I've thought of is, should this prove insufficient, that the 
+custom drawer be responsible for creating its own DE's. This would only be 
+necessary if the DE needs to maintain additional state information which 
+hopefully will not be necessary.
+
+On further analysis of the context, the big difference is that when the Mac calls
+the calculateWrapping, draw and calcNextDrawHeight, draw methods on a custom
+drawer it is in strict sequence as we go down the pages.
+
+When we replay pages under Windows this may occur in any order - a fragment 
+on page 11 may be drawn then the user might skip to the previous or next page.
+
+Thus the oofDE used to provide custom view drawing can't assume it gets to 
+call the original methods in a particular order.
+
+DECISION - extend the custom view drawer model so it can make oofDE's to preserve
+the context at draw time, making the user responsible for the state they preserve.
+
+SIDE ISSUE
+In updating the sample program to test this it occurred to me that we show the use
+of oofRep::changeTextStyle at runtime. In order to make this something that users
+can continue to call in the playback of their custom oofDE, the recording aspect of
+changeTextStyle must be aware that playback is taking place!
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/27
+EDITABLE PREVIEW WINDOW SUPPORT
+
+We need to provide some storage for edited cells as the user exits them.
+
+ALTERNATIVES
+1) some chain of edited cells preserved in the preview environment
+
+2) the entire report copied to a secondary database and automatically
+   save fields back to that database.
+   
+ISSUES
+1) has an advantage of not re-running the report or the overhead of 
+   copying data. However it is hard to see how we can change the report
+   rendering to start taking *some* data from an alternative list of data
+   rather than the dbView which is the source for all columnar tables.
+   
+2) whilst more straightforward introduces an overhead if automatic that is
+   going to penalise every user. It might be possible to defer copying until
+   editing actually takes place, but this should be regarded as a later 
+   optimisation.
+   
+   There's an attractive thought here that if we directly operated with an 
+   XML database then that would save an extra copy. However the work in getting
+   a true XML backend going is prohibitive.
+   
+   When we copy we can mutate the report objects slightly so field blocks become
+   text blocks (allowing editing).
+   
+   Can have an explicit makeEditable call in the application code so plain lists
+   are not editable and so the overhead of copying is avoided where the user is
+   unlikely to want editing.
+   
+   Corollary - as we create a temp database when we read a report back in, all
+   re-loaded reports can be editable.
+   
+   Thought - can we make this the mechanism for making editable? You can only edit
+   a report after Save/Open? Even if we just used this behind the scenes, to avoid
+   extra coding.
+   
+   Uggh - I just realised that we also need to save the settings indicating which
+   report items are editable and the editor hooks. Either that or we need a model
+   which doesn't care.
+   
+
+99/04/28
+With the Editable View ideas discussed in the OOFILE Design Decisions that will
+provide transparent support for a dbView to maintain modified content. This means
+option 1) is now viable, however it will require a report to maintain a subclass
+of a dbView.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/11
+CONNECTING VIEW BANDS TO DATABASE
+
+An issue which was deferred until data parsing working was how we create a dbView
+against a real database, when creating a view band in the <layout> parsing.
+
+The most attractive idea from a user point of view is for the XML file to work
+with <schema> and <layout> tags in any order. This requires the ability to create
+a dbView without a real database, or an oofRepViewBand without a dbView.
+
+Considering more realistic constraints, every XML standard I've seen has a separate
+schema document, or a schema (eg: DTD) at the head of the file.
+
+Thus it is fair for us to assume we can parse the schema before the rest of the
+report - there are no user assumptions being broken here.
+
+Given that the schema is parsed, it is possible to create the temporary database
+directly at the end of the <schema> - we enforce the standard of one schema per
+XML file.
+
+Thus, all that is left to resolve is how the layout parser knows about the schema.
+
+In normal OOFILE terms, a schema is represented by the dbConnection from which you
+lookup tables.
+
+Options:
+1) Pass the dbConnect* into the layout parser
+
+2) have the dbConnect* available through some global lookup, maybe as part of 
+   the report.
+   
+I can't see any benefit to 2) and there are no problems with 1) - we will pass in
+a dbConnect* to a layout parser, similarly to how we already pass one into a 
+data parser.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/14
+STATE TRANSITIONS IN MULTIPLE AND COMPLEX REPORTS
+
+Within complex reports, with bands nested as footers etc. we have a very
+complex series of state transitions possible, such as:
+
+pageHeader bands
+   space
+   layout
+      blocks
+body view band
+   header bands
+      view band
+      footer bands
+         layout
+            blocks
+         line band
+   break (every record)
+      view band
+         header bands
+            graph
+   break (every record)
+      line band
+   footer bands
+      line band
+      view band
+         footer bands
+            space
+            layout 
+               blocks
+pageFooter bands
+   space
+   line
+   layout
+      blocks
+      
+      
+Thus it is possible to have transitions out of footers occurring 
+nested within headers and other mixtures.
+
+The model implemented in OOF_repState2XMLelement is insufficient as it was
+based on a simpler understanding of reports and doesn't provide recursive nesting
+of states.
+
+It's also long been acknowledged that multiple reports present a complex initialisation
+problem for saving reports (XML) with the need to provide a single database schema
+as well as individual <style> and <layout> areas.
+
+So, a generic reportVisitor could replace the iteration built into bandList, breakList 
+and oofRep, providing visitors to:
+- call makeRender 
+- call finishConstruction
+- gather and uniquify all schemae across multiple report sections
+- create <layout> and <style> tags within a single report
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/16
+USE VISITOR FOR XML SCHEMA, LAYOUT AND STYLE GENERATION
+We need to do some things depending on band type, like the render model which
+factors out drawing depending on environment.
+
+Don't forget we will be adding text styles per view column in the near future.
+
+The construction that is performed in the XML render ctors currently appends
+to style and layout strings stored in the environment.
+
+Alternative 1)
+- use a visitor to do all this and downcast bands as appropriate using RTTI
+- means we lose the ability for renderers to be provided by user if they add
+  report band subclasses
+- messy engineering (not a major consideration at this time)
+- saves a minimal amount of time for the tradeoffs
+- similar accumulation of style and layout in strings as at present
+
+
+Alternative 2)
+- add another virtual method to renderers, maybe drawLayout() we can use to 
+  generate the layout (and other environments may require the separation)  
+- visit styles separately from layout
+  - implies ID's allocated up front
+  - may be applicable in RTF and HTML environments in future (visiting styles, as
+    an abstract base)
+  - can directly output styles and layout to stream rather than having to accumulate
+    in strings as at present
+
+
+Alternative 3)
+- leave layout construction in renderer ctor as at present
+  - problem because it happens during multiple report too early
+  - solve by having multiple style and layout strings per section?
+  - too complex for creating schemae at same time
+  
+DECISION
+use separate drawLayout method and style visiting as in 2)
+  
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/17
+PARSING CUSTOM CODE
+
+TO DECIDE Loading custom code 
+- can have unique tags for each type
+- determine type from context, using generic <customCode>
+
+Remember that the custom code elements will always be embedded in a 
+fairly direct parent (all immediate at present) such as <break>,
+<column> etc. so context is visually obvious.
+
+Using generic tag allows standard code and speeds parser.
+
+Can use context flags fairly easily to downcast for specific storage
+when call factory.
+
+DECISION - use generic tags
+
+-----
+
+TO DECIDE - structure of custom storage
+- for any such element need sub-elements
+  - factoryFunction
+  - data
+OR
+- nested parser which user can replace so no assumptions as to
+structure at all!
+
+DECISION - simple serialisation string for now as it's much easier for user
+(expatpp ultimately easier but simpler communication of requirements if
+user told have to manage own reading/writing to string)
+  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/23
+DELAYED LOADING OF STYLES
+
+In the XML parsing to read in reports, we have a CSS styles string and a layout
+which may occur in any order and we want a way to delay loading of text styles
+until this parsing is complete.
+
+Initial ideas were that the text style would have a CSS ID and do its own lookup
+when necessary from some central ID-style content dictionary.
+
+However, the 'promise' pattern (not sure if there's an official name) is that we
+put in a Promise object instead of the fully instantiated object.
+
+This could be accomplished in this context by having an OOF_promiseRepTextStyle
+subclass OOF_mixPromise as well as oofRepTextStyle. This stuff can be kept solely
+within the XML parsing.
+
+Using a standard promise pattern and classes to manage makes it easier to extend
+this model, which is likely to include more separate styles in future.
+
+Moving the ID and back-pointer to the manager into the Promise subclass avoids
+confusing the user with having anything purely to do with reading reports
+cluttering up the parent classes.
+  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/26
+XML LAYOUT COLUMN DETAILS - ELEMENTS VS ATTRIBUTES
+
+The issue of what to put in attributes is driven by readability, consistency
+with other tags and some basic principles (unfortunately variable in the XML
+community). The simplest principle I try to use is "if it is visible data, it
+should be an element". This is easier in the case of using XML to save the
+report format - we have a guideline for what's visible in the preview window.
+
+The most important reason for violating this principle is if we have to store
+data which is structured, rather than a simple atomic value which could go in
+an attribute.
+
+We have established precedent for the 'align' attribute of a layout item in 
+<inline> and it matches the visibility principle to use an attribute.
+
+Column headers are clearly visible text so go in an element.
+
+Column width feels like it should be an attribute. However, it is possible in 
+future that more sophisticated ways of specifying width will be allowed 
+(oofColSizer IS overrideable!) and we need to leave it open for the <width>
+to contain structured details. (eg: width could be specified relative to
+another column, so would maybe contain <relativeToCol> and <relativeWidth>.)
+
+Custom code generically has to contain several elements so there is no
+argument there - it has to be an element.
+		  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/26
+ADD READING/WRITING CUSTOM CODE
+
+We currently have custom code attached to breaks, adorners & view drawers.
+
+Lets look at the issues in creating each type and base attributes
+
+oofRepBreak - has the breakNewPageEveryTime flag passed into the parent ctor
+oofAdorner - parent ctor has no attributes, wide variety in our immediate subclasses
+oofRepCustomViewDrawer - no base params
+
+Given a single factory function registration, because we restore all these 
+custom types in context we can load standard base attributes from the XML
+and pass that to them. This has two advantages:
+1) the serialize methods aren't used for parent attributes
+2) a custom function which doesn't store data doesn't need to implement serialize
+
+The alternative would be that the serialize is used for all data including the 
+simple parent attributes, which adds an extra burden for the user and requires
+these attributes to be settable after construction.
+
+However, note that setting the attributes after construction does NOT require a 
+public interface - they are set by a static function which as a member of the
+class can set them directly.
+
+DECISION - require serialization to store all attributes including parent
+as it keeps things simple for us and there are not enough opportunities to justify
+a more complex solution in OOFILE.
+
+NOTE in context it is possible that serialisation may be to a single attribute.
+Thus, for now, we could serialize the break 'when' value to an attribute (but will
+avoid implementing serialization for breaks as they work and our immediate client
+for XML support doesn't use custom breaks).
+
+
+Writing Adorners
+----------------
+The specific case of writing adorners is a little more complex. 
+
+If Adorners were written as elements within the parent element layout then this
+needs to occur in two different kinds of methods. Simple bands have their layout
+written by oofDrawable::describeLayout() which of course writes both tags, usually
+as an inline pair.
+
+More complex elements are written (eg: layouts, view bands) by the oofRepLayoutVisitor
+as it processes other elements within them.
+
+Alternatives:
+1) write adorners within the layout
+   1a) provide a simple function for describeLayout in the XML renderers to use
+       to write out adorners
+   1b) split describeLayout into openLayout and closeLayout calls
+   
+2) write adorners separately, attaching via ID's
+   2a) write an <adorners> section within <style>
+   2b) write <adorners> as another top-level section   
+
+Taking alternative 1) we complicate the appearance and readability of the XML within the
+<layout>. It is also mingling the intent of the separate <layout> section - describing the
+layout with the ability to modify appearance. Adorners are attached to layout objects in
+the same way as text styles are attached. It is much more in keeping with our philosophy
+to therefore store adorners outside of <layout>. This also has the advantage of minimal 
+disturbance to the working code for writing and parsing the layout.
+
+Refining the choice of 2)
+Putting the <adorners> tag within <styles> will complicate the parsing, output and
+visual reading of <styles> for no apparent benefit.
+
+DECISION - 2b)
+
+
+Reading Adorners
+----------------
+The same issue arises as with styles - we parse adorners and layout at different times,
+in possibly either order, and need delayed completion.
+
+Alternatives:
+1) Attach a promised adorner to every drawable which has an ID, like styles
+
+2) An We could visit the newly constructed report and see if any adorners exist for each drawable
+
+Both options mean we now have to add ID's for each drawable which has adorners.
+This is likely to be a largely overlapping set with those that have text styles
+and our text style mechanism already copes if styles aren't found to match ID's
+so there is no penalty here.
+
+Option 1) means the adorner list for more drawables will be getting hits, causing
+heap expansions and later removal of those adorners. It requires a pair of
+promise classes.
+
+Option 2) visits many objects for few hits. It requires another visitor class.
+
+DECISION - 2) is more function calls in OOFILE but far fewer heap hits and simpler to write.
+
+
+Parsed Adorner Lookup
+---------------------
+With styles, we have a simple lookup mechanism for text in CSS-style strings. 
+
+With adorners, we will be reading in structured information and need to retrieve
+by ID string.
+
+This can quickly be implemented using a trivial subclass of OOFILE_PublicBase to
+own an oofAdornerList. Whilst non-optimal, this is robust and doesn't process
+many objects. (Yes, I know some people would say we could use STL classes here
+but OOFILE doesn't force use of STL because many people appreciate that, whilst
+it doesn't stop STL purists using our product.)
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/31
+READING PAGE NUMBER BLOCKS
+Currently we handle all blocks within layout bands as text blocks, reading
+back <inline> tags.
+
+We thus only need to read a single block of text.
+
+Page number blocks store leading and trailing text.
+
+Alternatives:
+1) use a simple masking approach, storing a code like ^P in the <inline> body
+
+2) make pageNoBlocks into structured elements with <leadingText> <trailingText>
+   sub-elements
+
+3) use attributes for leading and trailing text, on a <pageNo> element
+
+Option 1) is a trivial change to existing <inline> parsing and has an appealing
+simplicity to anyone used to using markup codes in office tool headers and footers.
+
+Option 2) is theoretically cleaner but makes the simple header and footer layouts
+in which we typically use page numbers a lot more cluttered
+
+Option 3) violates the consistent way we've used elements vs attributes.
+
+DECISION - for simplicity of implementation and hand authoring, 1)
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/06-07
+EDITING REPORTS - INTERACTION MAPPING
+
+We need a way to map a point clicked on the preview window to a report object
+and in most cases to data within that (eg: left or right leading text in a PageNoBlock,
+left, right or field text in a FieldBlock, a given cell in a view band).
+
+A map of coordinates/rectangles generated for each page is the only possible 
+cross-platform approach as we don't have a set of live objects for each page 
+on the Mac and the oofDE's used on Windows are too fine a granularity (each line).
+
+So, how does this map get accessed and translated?
+
+The current ideas
+- search topLeft point in RAM database
+- don't need superfast response as not doing flyover
+- think about using EditHelper in "single-field" serial mode
+  and without need to force saves    
+  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/06-07
+EDITING REPORTS - BACKEND 
+
+Report-writer cleanup. Need to iterate through tables setting save state then
+unloading their cache. Note that when we read a report in from a file we don't
+need this as it's OK to save the state back to the report.
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/07/11
+FIX FAILURE TO WRITE XML SCHEMA FOR STANDALONE FIELD IF NO TABLE IN VIEW
+(KIDMAP Students Note report)
+
+A dbView with a single standalone field attached writes XML like:
+      <elementType name='data_1-1-2'>
+         <elementType name=''> <datatypeRef name='string'/> </elementType>
+      </elementType>
+
+The non-existent table is given an automatic name based on depth by 
+oofXMLwriter::CalcNames however the source='' clause in the table is blank.
+
+The current method of assigning automatic names for non-existent tables has a
+fragile assumption that the visitor writing the schema is going to be able to 
+create the same ID as a visitor writing the layout.
+
+This seems reasonable but is already broken.
+
+Alternatives:
+1) create a dummy file on the view which exists solely to contain a name
+  (uggleeee)
+  
+2) make views able to be named
+   
+3) use a single dummy name repository for the entire report
+
+
+Names on views has some appeal because it may be useful in a more general sense. 
+However, it adds further overhead to dbView objects and also involves core changes
+at a time when we don't want to touch the core. It may be worth revisiting.
+
+Option 3) is simple and at first appears easily implemented with OOF_DummyString,
+however closer inspection shows that OOF_DummyString is implemented in a manner 
+which makes it hard to reset the counter without other side-effects. If we can't 
+reset the counter then we can't regenerate the names and anyway a regeneration
+mechanism leaves us back where we started. The bottom line is that we need the
+local object to be able to refer to a name.
+
+Decision - use 2) because it is by far the cleanest approach.
+
+DECISION - use 3).
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/07/13
+BUG WITH WRITING REPORTS WITH CENTRED BLOCKS
+
+There is a problem if we apply text styles to a layout band and use
+block alignment to centre a block, rather than using a centred text style
+on the block. The bug may only manifest itself in combination with an 
+adorner, as now tested in CSampleBase::DoStudentReport (the Report with Graph
+in the sample program).
+
+Inspection shows correct XML, with the adorner and style having the correct ID 
+for the layout band <box> and the block <inline> having a centre attribute.
+
+The bug appears to be in parsing - breakpoint code to see what happens
+(later found ID wrongly assigned to block).
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/06-07
+EDITING REPORTS - EDITING INTERFACE
+
+Major issues:
+1) navigation
+We have two conflicting areas of navigation - within the elements of the visible page 
+vs within the cells of a table. These appear at first to be the same. However, consider
+the scenario of the user who starts editing cells, keeps going to the 'next' item
+and then finds themself in a page footer, whilst knowing that there are more records
+in the table!
+
+It makes even less sense when we consider that the last visible cell in a table may 
+have an invisible continuation onto the next page.
+
+Suggested solution - separate navigation within table from within elements.
+Within a table is record-oriented so can do the entire current selection
+regardless of breaks. Note that discussions with Mercator suggest this approach
+anyway as being less likely to cause user confusion.
+
+
+2) mapping changes to database
+The KIDMAP spec talks of Save and Cancel buttons, implying that a stream of changes
+can be cancelled at the close of the Edit window. This is separate from the idea of
+changes not being saved back to the database and the saving of the entire report
+to an XML document (at close of Preview window).
+
+This was not my original intent - differentiating a stream of changes is very hard
+because the user can invoke an edit window multiple times whilst the preview is 
+active so we end up with a temporary edit list of changes as well as the changes
+that are (currently) layered on top of the unchangeable database.
+
+One way out is to say we don't support this behaviour in our default edit interface
+and if they want to support it, they can simply save the report out to XML and re-parse.
+
+
+3) Generating mapping elements
+We need a way to hook into the report writer easily to generate the mapping elements
+without forcing major rewriting of renderers. Within a page, mapping elements need to 
+know their vertical start and horizontal dimensions (band-level decision). We can
+simplify some things by having a mapping element know the horizontal divides, eg: view
+column widths.
+
+One useful approach might be to generate these in the oofRep::DrawViewBand and DrawBand
+methods. However this is a bit of further pollution of design.
+
+A cleaner approach is to subclass the renderers and have environments (which make
+renderers) either subclassed or parameterised.
+
+Keeping the environment as the central generator of all report elements is a nice
+touch but may be a problem with Windows, the oofRepWindow ctor explicitly creates
+the oofRepWinGUIPreviewMFC.
+
+Maybe we need a report setting that the preview can use that points to an
+interaction factory?
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/10/25
+BUG ASSERT ON mHaveCalculatedWidth WITH XML RENDER
+
+The assert is occuring because mHaveCalculatedWidth, is set byt the method 
+oofColSizer::calculateWidths which is never called. 
+oofrepmac sets up this variable in finnish construction. 
+Mercator reports usually are called after preview
+and this has been set by oofrepmac so we intermitttently see this assert
+
+In oofrecmacdraw.cpp this method is called
+by oofRepViewBand_MacRender::finishConstruction and a possibly redundant call in redundant call in 
+oofRepViewBand_MacRender::drawoofRepViewBand_HTMLRender::drawColumnHeader
+
+the call stack is 
+oofRepViewBand::makeRender(const oofRepMacEnv& env) 
+	oofRepViewBand_MacRender::finishConstruction
+		oofColSizer::calculateWidth
+
+
+In the rtf and html renders calculateWidths is called in 
+oofRepViewBand_HTMLRender::drawColumnHeader
+oofRepViewBand_RtfRender::drawColumnHeader
+	which in rtf and xml calls calculateWidths 
+	
+DECSISION
+	add a finnish constuction to the XML renderer which invokes oofColSizer::calculateWidth
+ and intiailises the sizer. this makes sense as this only needs to be calcualted once. 
+ we must check if the possibly redundant calls are redundant and if so remove. Beware maybe this could affect adorners.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/10/25
+BUG ASSERT ON CONSOLE TEST SVAE OF TSV AND CSV REPORTS
+
+This was narrowed fowd to occurr on multi reports. 
+Discussion with andy stated that csv tsv may not be fully tested I assumed that they were both working.
+With this new knowledge, I figured out that the start/end enviroment calls were spurious, 
+these are used by xml and html report code to put the outer wrapper tags around the output>
+Otherwise the header and footers should be darwn by the rep draw method 
+In the case of mulitreports The existing csv/tsv code  the draw page header and 
+footer flags are not being set, when the tsv console test called these. 
+
+Dumping state missed this as the state is held locally in the draw method which is set by a call to 
+oofRepTSVEnv::preprocessesPageHeadersAndFooters() const
+or oofRepCSVEnv::preprocessesPageHeadersAndFooters() const
+These calls return a hardcoded true or false so the state exista in the code and not a state vaibale 
+
+For some reason these flags were set on the gui version (why i do no t know)
+
+As far as i can see the footers and headers do not need to be preprocessed,
+as there are no page breaks drawn in a TSV or CSVreport so we oly need the normal page headers beong drawn once
+Test show this fix works on console and kidmap
+
+DECSIONS
+	1. Remove oofRep::currentReport()->drawPageHeaders/footers from startEnvironment end envrioment calls
+for the tsv/csv enviroments 
+	
+	2. Leave empty function in the startend envoriment for possible future enhancment
+	
+	3. make oofRepTSVEnv::preprocessesPageHeadersAndFooters and 
+	oofRepCSVEnv::preprocessesPageHeadersAndFooter calls return false instead of the current calls 
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/02
+EDITING REPORTS - EDITING ENVIRONMENT SUBCLASSING
+
+We want an environment to subclass or wrap the GUI environments in order to make
+renderers that record the drawing positions.
+
+Should this environment be a subclass of appropriately Mac or Windows GUI or
+should it be a wrapper returning those environments?
+
+If a subclass, we have to cope with the highly similar code descending from
+different bases depending on platform, possibly with the parent being #ifdef'd.
+
+If we want it be used in the zig-zag dereferenced dispatching
+(makeRenderDispatch) then the editing environment must be a true subclass of
+oofRepEnvironment. However we can combine the approaches so the platform-specific
+logic is a single method, returning a wrapped environment.
+
+Subclassing avoids a problem with a lot of platform specific methods having to be
+forwarded as there is tight coupling with the printing subsystem (page setup
+structures) on each platform and services provided to the platform-specific
+preview windows.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/06
+MAC PAGE SETUP - AVOID DESTROVING ENVIRONMENTS
+
+There is a long-standing comment in oofRepWindow::DoPageSetup (Mac) that it
+should be improved as the current logic destroys and recreates the environment.
+
+This slightly complicates the creation of the editing wrapper environment and also
+seems an unnecessary overhead.
+
+Alternatives:
+1) leave the logic as present but add a factory method that creates the
+   editing environment (called from here as well as the ctor)
+   
+2) change the logic to avoid recreating the GUI environment.
+
+Looking at what happens when we recreate the GUI environment, all we do is duplicate 
+the page setup. This can easily be moved into a setter.
+
+DECISION - 2) because it simplifies other areas and comes at almost no cost.
+
+
+NOTE
+This leads to another question - when we print don't we recreate the environment
+and consequently other objects (eg: renderers)?
+
+No - the environment is passed into the report. The print environment and GUI are
+of the same basic type (eg: oofMacEnv::renderType()) so renderers aren't
+recreated.
+
+
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/08
+EDITING REPORTS - RENDER MAPPERS FOR VIEW AND LAYOUT
+
+In particular for Layout bands we have a render draw called which calls draws for
+the blocks within. ie: oofRepLayoutBand_MacRender::draw does all the positioning work.
+
+Do we want a special capturing mode for this and possibly view band or is it OK
+to capture this draw and then capture again the blocks within?
+
+If we want a special mode how do we know?
+
+Does oofRepEditingEnvironment::makeRenderDispatch make different renders based on 
+RTTI test? (yuck!)
+
+Do we have special render made by makeRender(oofRepEditingEnvironment&) where
+1) most return wrapped render
+2) view and layout return special band renderers?
+oofRepEditingEnvironment::makeRenderDispatch
+
+Another alternative is to have a makeRender for the editing environment. The
+default case can use a parent() method to get the actual rendering environment,
+but it allows us to generate specific wrappers for the view and layout bands and
+for future customisation in user added bands.
+DECISION - use makeRender(oofRepEditingEnvironment&)
+
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/09
+EDITING REPORTS - MAPPING CONTENT AS WELL AS DRAWING OBJECT
+
+There is a fundamental problem which I've overlooked so far in editing.
+
+It arose in the the saving of reports to XML and their restoring - we have a 
+dimension of layout objects orthogonal to a dimension of data.
+
+For example, a nested table showing related student marks will have different content
+on each successive page.
+
+The way in which each report page is constructed for drawing means there is no link
+at preview time between a given page and the data used to construct it. On the Mac,
+we create a PICT for each page. On Windows a similar home-grown mechanism is used
+with a page full of oofDE's.
+
+However, the side effect of editing is to violate the page encapsulation - the report
+is supposed to be reflowed because underlying content has been modified.
+
+It is possible that a nested table will have totally different selections on 
+successive pages. It is NOT possible that the same report element will have its 
+dbView pointed at a different table (user code could possibly hack this but it
+will not be supported).
+
+Therefore the issue is one of keeping up with changed selections on different pages.
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/08
+EDITING REPORTS - LINKING EDITING BY BRIDGE OR API
+
+See long disjointed entries around 99/10 in thoughts diary.
+
+We have oofRepDrawable as a base rendering class that also in some way 
+relates to content.
+
+We also want to somehow abstract linking of that content to an editing class.
+
+There is a superficial attraction to using the OOFILE GUI classes. However on
+closer examination we have a much more complex and higher bandwidth connection.
+An oofRepDrawable can mask a set of report styles, custom rendering objects and
+one or more views of the database. It can also just store its content in literal
+strings in the drawable itself.
+
+Trying to abstract all this to the simple database-form API of the GUI is too hard.
+There may be larger abstractions to be found by refactoring both in future.
+
+So, for now the main decision is whether 
+a) oofRepDrawable should implement an interface that an editor can use directly, or
+b) an abstract edit link is added as a Bridge 
+
+DECISION 
+There are too many possible variations in drawables to constrain their data access
+so for now we will have an explicit edit link class as a Bridge.
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/14
+EDITING REPORTS - ACCESSING STYLES
+
+All oofRepDrawables have a text style. If they don't provide an overriding style
+the enclosure style cascades in for their use.
+
+At first glance it looks like a very nice idea for an editing dialog to also allow
+the setting of the text styles (ignoring custom content such as Mercator's use
+of the Led WP engine where portions of their content are styled).
+
+However, there are a number of savagely competing forces:
+1) If you are using a cascaded parent style, is the user editing that style or a 
+   local copy? 
+   
+2) What is their model of changing style for a single cell in a 
+   layout vs view band and how do we cope with the inability to change other than 
+   the entire view? Presenting a user with the ability to change text styles in
+   totally different manners depending on context sounds very dodgy. I'd rather 
+   suppress the feature until we have more flexible styling (eg: ability to override
+   a single cell in a view).
+   
+   
+3) If we want to return a null entry how do we manage when returning concrete copies?
+
+4) if we return pointers then the app code can update them.
+
+
+DECISION
+Implement a very simple model where we expose the style via a pointer but 
+don't attempt to provide a smarter model allowing adding cell styles etc.
+
+Exposing both the default text style and the local one allows a user subclassed
+editing dialog to choose to set local styles however the meaning may vary - the
+local style on a view band is the band (as opposed to the whole report) but
+local style on a text block in a layout is the block itself. The application coder
+is empowered to be able to access the variety of styling available on OOFILE and it
+is up to them to resolve UI inconsistency.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/16
+EDITING REPORTS - WHERE TO STORE LINKING INFORMATION
+
+A view band going on to a new page is contiguous for editing, regardless of
+other content that is drawn between (eg: page headers/footers or breaks attached
+to each record of the dbView).
+
+A view band that starts on different pages is presumably a sub-band, 
+probably a different data selection and has a separate link object.
+
+oofRep::DrawViewBand calls start on the view's data source. So a sub-band
+(eg: in a break on every record of the parent view band) will have start() called
+many times. In most cases sub-tables would be related data being refreshed 
+automatically by the OOFILE database core, as the parent table iterates.
+
+Therefore the database selection behind the dbView for each sub-band will 
+have changed. There is also a fringe condition possible where user code
+might actually have sub-tables drawing totally different view bands, due to 
+break processing changing the report definition whilst running. Anyone doing
+things that weird are pushing their luck, although cloning the view will still
+work provided the original table is not deleted!
+
+It is apparent from this complexity that an external state needs maintaining
+separately from oofRepViewBand and yet individual to these drawables (or 
+subclasses). This alone justifies a separate linking class.
+
+The contiguity test shows that the links are NOT page-specific as a single
+link may be editing over many pages.
+
+DECISION - create link objects for each startTableBody of the 
+SUB-ISSUE - if we save selections that doesn't work if the dbView owns its data
+therefore should we save dbViews and if so are there cloning issues?
+
+DECISION - save dbViews in the link objects for nested views (can optimise the
+simple common case of the topmost view band).
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/19
+EDITING REPORTS - WRAPPING LAYOUT ITEMS
+
+We have text blocks with multiple editable and non-editable text areas, 
+eg: a page number will have an editable area either side but display the
+current page number disabled as a middle block.
+
+Layout bands therefore need to query the blocks they contain to see how many
+text items are in each. This implies a generic text block link can iterate
+the text items for each block.
+
+Remember a layout band can mix non-editable blocks, eg: pictures.
+Should we see these as missing squares or reducing the row height?
+
+
+ISSUE UNRESOLVED - how does a layout band map the block wrapping to a grid?
+The moveDownAfter logic may need preprocessing to get the grid, or are we
+late enough that we generate a grid?
+
+See further discussion 2000/01/05
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/21
+EDITING REPORTS - VIEW BAND WRAPPING - REFACTOR TO DELEGATE BETTER
+
+In most cases, a Decorator for an oofRepDrawable can provide only the virtual
+interface of oofReDrawable. However in the case of view bands they play a 
+significantly enlarged role and extend the interface with methods such as
+startTableBody.
+
+This realisation came about from the need to implement startTableBody in the
+oofRepViewRedirectingRender to capture the dbView being reported, as decided in
+"EDITING REPORTS - WHERE TO STORE LINKING INFORMATION"
+
+To successfully decorate an oofRepViewBandRender it seems that our 
+oofRepViewRedirectingRender must be a subclass of oofRepViewBand_Render.
+
+A similar issue crops up again with the mEditor member in oofRepRedirectingRender.
+Not sure if we actually need this member.
+
+Alternatives
+1a) copy the rendering logic and move oofRepViewRedirectingRender under 
+    oofRepViewBand_Render
+
+1b) isolate some decorator logic in a mixin and have oofRepViewRedirectingRender
+    inherit both that and oofRepViewBand_Render
+    
+2) Use virtual inheritance for oofRepViewRedirectingRender to inherit from both
+   oofRepViewBand_Render and oofRepRenderDecorator.
+
+3) Refactor the way oofRepViewBandRender is used. At present it is used by casting
+   an oofRepRender* member of oofDrawable. For the limited cases where the extra
+   interface is used, we could have a secondary member in oofDrawable which is a
+   mixin (eg: OOF_mixViewRender) that we can also use with oofRepViewRedirectingRender.
+   
+
+Option 3) maintains a cleaner object structure at the expense of a little extra 
+complexity in oofRepViewBand::makeRender which is balanced by removing some downcasts
+in oofRepViewBand::startTableBody etc.
+   
+However it is a little more complicated in the copying.
+The base oofRepDrawable copy ctor calls a clone method on the renderer to set 
+mRender in the new drawable. We need a way to update our other member.
+
+This other member (eg: mTableExtraRender) may be a pointer to our mRender object
+(which is a mixin) or a separate object. However there is presumed to be some 
+association between the two.
+
+Therefore our mTableExtraRender could be used to call a clonedRelative method
+which takes the new mRender as a parameter. That way we have a virtual method
+that can be implemented in many ways to return either a cast pointer or new object.
+
+DECISION use 3) given the solution above to the cloning problem.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/22
+EDITING REPORTS - HANDLE VIEW OVERRUNS
+
+We have a long-standing problem with the view bands being too smart, 
+implementing the page overrun and break to next page within their draw
+(calling drawOverrun) method.
+
+The general refactoring to remove this has been postponed but immediately the
+editing decorators are in trouble - we want to know if a view band has had
+to split a row across pages in order to add interaction areas for the view band.
+
+The problem is knowing where they start.
+
+When we break to a new page there are page headers to draw, possibly some 
+borders and then a partial row of the view band. In some circumstances that
+may be the last row so we can't just set a state flag and pick it up in the next
+oofRepViewRedirectingRender::draw.
+
+ALTERNATIVES
+1) use a flag to say we've had a page break and catch it in the next draw or 
+   endTableBody, making some assumption about a view band continuation
+   
+2) explicitly detect view band continuations with a param to the page break 
+   indicating continued content.
+   
+3) Refactor the draw overrun logic so it involves some virtual step.
+
+Options 1 & 2 rely on various assumptions to get the starting point of the 
+continued draw line.
+
+Option 3 is quite a trivial change as an addition to the drawOverrun logic and
+can call an empty method for non-editing renderers. The problem is that our 
+decorator is NOT a subclass of oofRepViewBand_Render and so is not in the vtbl
+hence an override of startOverunRow would not be called.
+
+To have a method picked up at this point it would need to be back to the 
+owning oofRepViewBand (which *does* point to a redirecting render) or via the
+environment.
+
+It feels like a bit of a hack, but putting a method in the environment
+is a very simple additive solution. If we're going to go this far we may as 
+well simplify the environment side and use two calls - one to say we're breaking
+the current draw and another to say we've resumed. That way, no matter how complex
+the accompanying page footers and headers, the environment has been given clear
+indication which band was being drawn at the time of the page break decision.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/22
+EDITING REPORTS - MULTIPLE PAGE MAPPING
+
+So far we are just recording positions of objects drawn on the page.
+Obviously we must have some way to differentiate the mapping for 
+the current previewed page.
+
+ALTERNATIVES
+1) Add a page number to the structure and compare page numbers as well as coords.
+
+2) Store a map per page.
+
+Option 1) is simpler in storage management but has a linear search time
+as page counts rise and will cause a lot of copying as the map expands
+in a large report.
+
+Option 2) has a vastly simpler allocation profile. With appropriate
+initial map allocs we should avoid any map expansions so we have a main
+heap hit of once per page. It keeps the search times down to minimal,
+having at worst case only to skip over the N items in a page (and we can
+later sub-index rows if better performance needed.)
+
+DECISION - use 2)
+
+In reaching this decision I had to think about the resetting of pages
+when we reflow reports. It reminded me that original sketches show the
+page maps owned by the editor but it may make more sense for the
+environment to own them.
+
+Consider this - the editor continues possibly through multiple reports
+but the environment is created for each preview.
+
+It makes more sense for members used to edit a specific report be
+transitory and therefore in the environment. The oofRepEditor should
+contain factories and anything else with multiple report preview scope.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/26
+RTF PROBLEMS
+1. page break are not wrapped into blocks { }
+2. first section headers use default
+ 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/27
+LINKING REPORT PANE TO INTERACTORS
+
+We need a way for the report pane to tell the editor about click and
+other events.
+
+This involves some kind of link directly connected to the preview pane.
+
+A given report may be linked to an editor via the settings. As these can
+be cascading from the global settings, we have one editor as a strategy
+object potentially in use by several reports at once.
+
+The oofRepEditingEnv however is created for a specific report window and
+is owned by that window.
+
+Therefore it makes sense for the lifetime of the interaction link to be
+tied to the environment.
+
+A competing force is that we have tried very hard to make the editing
+environment classes cross-platform. Knowledge of how to link to a report
+pane is highly framework-specific. In PowerPlant we can use an
+attachment to capture clicks (and later keystrokes if desired). In MFC
+we will have to use subclassing of the preview window.
+
+In early design of oofReportEditor we added a strategy object however it
+is not clear at present how that connects to a window. The main reason for
+having a default strategy object was to give the callers of addInteractionArea
+the flexibility to specify their own interactors.
+
+ALTERNATIVES FOR STRATEGY & LINKING
+1) remove strategy object, assuming user will subclass oofReportEditor anyway
+   and are unlikely to want multiple strategies per application
+
+2) strategy object manages link and registers its interest in clicks, keystrokes
+   etc.
+   
+3) environment (as window-specific object) captures clicks and calls strategy
+   to provide the rules as to what to do with them.
+   
+   
+DECISION - use 3) as it is straightforward, keeps good separation of per-window
+responsibilities and gives a lot of flexibility.    
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/29
+WHO CREATES CELL EDIT DIALOG
+
+On clicking on an interaction area, we need to launch an editing dialog.
+
+This is platform specific.
+
+Opposing forces:
+1) oofRepEditor has been used to contain almost all the factory methods
+
+2) oofRepEditingEnv has platform-specific knowledge and per-instance window link
+
+Decision
+continue pattern of using oofRepEditor as factory but pass in oofRepEditingEnv
+so other info is available.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/02
+RECONCILING PAGE POSITION TO ARRAY OF CELLS
+
+In the current partial implementation we don't know the array location of an
+interaction area.
+
+Can we set this at creation of the area?
+
+To do so requires something that keeps track of array coord being incremented.
+
+Can we auto-generate this based on location and the assumption of L->R order
+of adding links? ie: if we are not increasing the Y pos then we increase the
+col then we reset the col to 0 when the Y pos increases.
+
+Remember that we do NOT add all the interaction areas for a given edit link
+contiguously. A view band continuing over pages may have intervening page 
+footers and headers. It may also be interrupted by breaks containing nested view
+bands, which are quite capable of running over page breaks themselves. No simple,
+single-layer context will work here.
+
+There's an attraction to using the edit link to store its current location,
+which would be used in this sense to record the location we're mapping and then
+again during the edit process. Edit links are uniquely instantiated for each
+contiguous report object - if the same view band draws multiple times as a nested
+band then multiple edit link objects are used.
+
+The only jarring note in this is the assumption that table-based objects can at 
+least maintain a current row from the current record in the table. However given
+that report objects are NOT just table based this is irrelevant.
+
+99/12/09
+The above reasoning does not sufficiently cover the issues because it fails to 
+provide a solution to incrementing the coordinates.
+
+The bottom-line is that the pattern of how we add cells and if we skip any
+can not be reliably deduced by information available at the point where we
+add interaction areas - it must be specified by the source of the interaction 
+are, the redirecting render object.
+
+DECISION - require the row and col address to be explicitly passed as we
+add interaction areas. The current row and col in the edit link will then
+only be used in the act of editing, which feels a lot cleaner.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/06
+OWNERSHIP OF EDIT LINKS AND CONTAINING EDIT CONTEXT
+The oofRepEditLink has moved from being a strategy class owned by a render 
+object to containing edit context which varies for multiple runs of the object.
+(ie: nested views have different database contexts).
+
+This causes an ownership problem - we can't just delete and recreate edit links
+as we startTableBody again.
+
+ALTERNATIVES
+1) Make someone else own oofRepEditLinks so many of them survive a render object
+
+2) Restrict oofRepEditLink to being just the Strategy object and use a separate
+Memento to store the context, somehow attached to the page where the link
+will be invoked.
+
+Note: we need to add some page-oriented storage for each oofRepEditLink anyway
+as each page needs to be able to store the starting array location for
+a given edit link.
+
+The lifetime of this database context information should probably be linked to
+the pages anyway as we re-render reports and invalidate pages when editing
+is complete.
+
+The manufacture of oofRepEditLinks and the way they encapsulate context is 
+finished and rather neat. We need to add a page-oriented connection to the
+individual oofRepEditLinks anyway.
+
+Therefore this connection could be one of ownership - an oofRepEditLink is
+owned by a given page, and each page has an entry for a link saying the starting
+row number (starting row of 0 implies ownership).
+
+As we need this mechanism anyway there seems little point in adding a separate
+Memento pattern to complicate things.
+
+Ownership by pages matches the lifetime already anticipated with rebuilds.
+
+DECISION - 1) with ownership by pages.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/07
+BUILDING WINDOWS - HOW TO HIDE MFC
+
+The oofRepEditingEnv conditionally descends from a Mac or Win GUI environment.
+
+On Windows we have kept the GUI side of the report writer and its consequent
+MFC dependency out of the report writer library, as the library is compiled
+without MFC.
+
+This implies that oofRepEdit.cpp must be added along with other MFC report-writer
+files to the user project.
+
+It also implies a little juggling of header files and class declarations to 
+move oofRepEditingEnv out of any public editing files included by other report
+writer files.
+
+This surfaces the issue that there should be minimal dependency of the report
+writer in general on the editing feature. The only point at which there
+is any dependency at present is the use of the oofRepEditor pointer in the settings
+because the report settings are used to set the report editor (in case of user
+override and as a way to disable).
+
+We have the opportunity to also remove this dependency and thus totally
+uncouple the main report engine, leaving the report GUI as the point of coupling
+between editing and the main report engine.
+
+DECISION Leave oofRepEditor* pointer in settings as it is consistent with other
+ways to affect reports and saves change at this crucial time.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/15
+TRIGGERING PAGE REFLOWS AFTER EDITING
+
+There are two parts to this issue - knowing when we need to reflow and triggering
+the reflow in the preview window.
+
+Needing to reflow is based on editing having taken place unless we take the bloody 
+minded approach of always reflowing.
+
+One way for the base class to know editing has taken place is if we implement the 
+MarkDirty methods and that sets a permanent flag in the OOF_mixRepCellEditor.
+
+Leaving that for later...
+
+When to trigger reflow:
+1) OOF_mixRepCellEditor triggers when destroyed
+
+2) the user dialog triggers on closing the dialog 
+
+Triggering actions in someone's dtor is something I like to avoid and as this is a mixin
+base class, destruction occurs very late in the process. Having the user dialog trigger
+may appear to be a dangerous dependency on user code but yields the added benefit that
+they can decide to defer reflowing! Another side benefit of command based is that we
+can support the paradigm of refreshing a report, in case of user code with dynamic behaviour.
+
+How to trigger:
+a) command back to report preview window
+
+b) direct callback to preview window
+
+DECISION As we're working in a GUI environment stick to the command broadcasting paradigm
+which will be broadcast from the user code.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/15
+AVOIDING CLONING IN VIEWS - USE EDIT CHANGES IN DIALOG WHEN REDRAWING
+
+A mistake was made in not considering the side effect of the bufferForever mode - 
+if our edit link classes have their own clones of tables (via their views) then
+the bufferForever will prevent the edit results being used to redraw the report.
+
+For the bufferForever to work, we MUST have edit links using the same tables as used
+to draw the report.
+
+This doesn't remove the need for edit links to sub tables to retain the selection,
+so they will have to preserve the selection independently.
+
+This can be accomplished by saving the selection and finding a suitable place to
+reset it. As we start using a given edit link to interact, we need to give it a
+chance to set the selection.
+
+Starting and ending interaction with an edit link need not be coupled to the duration
+of using the edit dialog. If users implement a nextItem button to move to another edit
+link then we have the transition between links.
+
+A counter-force which complicates this is that the tables being reported (and those most
+likely to be used in sub-views) often have related tables. These can't just have their
+selection arbitrarily set.
+
+IDEAS
+1) go back to cloning views and have some propagation mechanism or variant of bufferForever
+that shares the buffers (setting bufferForever prior cloning)
+
+2) have a wrapper object for restoring the selection which changes the current record of
+the parent table, forcing the related table to load the correct selection
+
+3) give up and only edit reports that are reloaded from an XML document (that have no
+related views but are independently loaded)
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/17
+CLEANING UP AFTER EDITING - RESETTING 'BUFFER FOREVER' MODE
+
+When should we reset the database buffer forever mode?
+
+Until the report is destroyed, it is possible for it to be re-run and the 
+effects of editing should be seen.
+
+Therefore we can't reset the mode at any earlier point such as the lifespan
+of a report environment
+
+The oofRepEditor object may be global and exceed the life of the report.
+
+The oofRep itself seems to be the only place. The corollary is that we don't
+have the objects around at that time that change the mode from the original.
+
+DECISION add a visitor to cleanup the report buffer modes.
+For now, document the restriction that if you use non-standard modes then you
+will lose them
+
+As a result of testing and considering this issue - we don't adequately set
+the bufferForever mode on all the nested views at the start of report processing.
+
+When related fields are displayed we are not buffering them.
+
+DECISION use the same visitor that cleans up the modes to set them once,
+after finishConstruction
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/19
+EDITING GUI - HOW TO PROVIDE DISABLING, DIRTY MARKING ETC.
+
+There's a strong attraction to reusing at least part of the OOFILE GUI to provide
+report editing features. Now that the products are available as Open Source, 
+there are no marketing reasons to keep them separate.
+
+We need a way to provide the ability to detect changes in a field and
+to disable editing, similar to that provided in the GUI.
+
+If we can at least use the field linking and adaptors of the GUI that makes life
+a lot easier for flexible cell editor implementation by users and means we have a 
+single set of classes providing these features.
+
+The alternative is copying small pieces of logic from the GUI and integrating with
+the report editing.
+
+Looking at dbEditHelper, that's unnecessary as it is oriented toward record management
+but the dbFieldLinks only actually deal with a dbHelper 
+
+DECISION - use dbFieldLinks to provide disabling and dirty marking
+
+So, who should be the dbHelper?
+
+1) the oofRepEditLink itself?
+- it knows the data source but this feels a little uncomfortably circular
+
+2) OOF_mixRepCellEditor
+- nicely straddles the world of the GUI and the data
+- is wired into when the edit dialog disappears so can unlink
+
+3) oofRepEditor
+- scope is too global
+
+4) oofRepEditingEnv
+- exists longer than the editing dialog
+
+So, do we need the edit helper to exist independently of the edit dialog?
+
+There doesn't seem to be any reason for that and it would be convenient for it to know when
+the edit dialog is deleted so any references can be cleaned up.
+
+DECISION - 2)
+
+
+OTHER ISSUES
+Looking at dbFieldLink and dbGUIAdapter, they operate under some base assumptions
+for which we need to compensate.
+
+Currently pairing is assumed whereas we will be changing the dbFieldLink used
+with a given adapter - the actual field will change as we step across a view
+and if we step to a different item we change the field link object itself.
+
+There are asserts guarding the assumption that we always have a field - this may
+be necessary (oofRepEditLink may need to point at fake field in layout bands).
+
+dbFieldLink owns the adapter it talks to so our cleanup needs to zero mAdapter
+to avoid double deletes. As many oofRepEditLinks will point to the same Adapter
+we will have to own it in the OOF_mixRepCellEditor.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/23
+BUILDING WINDOWS EDITOR - COLLIDING LIBRARIES AND MFC
+
+There's a problem with including oofrepedit into an application - it needs to 
+start with stdafx.h to be built into a Windows MFC app.
+
+However, if we try to build libraries with the GUI stuff included into the 
+report writer we get into trouble with MFC extension qualifiers and merging
+MFC stuff into the non-MFC libraries.
+
+One slightly coarse approach, if we consider the problem just one of inserting a 
+stdafx.h at the top, is to #include our .cpp file into another one.
+
+Rather than adding a shell responsible only for this addition, we can take 
+advantage of the Windows-specific editing file and #include "oofrepedit.cpp"
+at the top.
+
+This may cause a little confusion amongst developers but is the cleanest way.
+The other alternatives involve mingling libraries and understanding more about
+the ramifications of MFC extension library builds.
+
+DECISION - #include the source.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/23
+BUILDING WINDOWS EDITOR - INIT ORDER IN SAMPLES
+
+If we want a modal dialog to edit cells, we are faced with an init order.
+
+The initial abstract behaviour assumes a PowerPlant init order - the controls
+are loaded before invoking a modal event loop.
+
+The MFC DoModal triggers OnInitDialog and so we can't create a GUI adapter 
+before this. Thus loading must be deferred.
+
+Loading is normally deferred when using the OOFILE GUI interface classes
+and the more explicit model hd
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/04
+REDIRECTING RENDERERS FOR LAYOUT BANDS - GENERATING COORDINATES
+
+Layout bands don't descend into rendering other bands partway, 
+unlike views, so we can maintain a global context.
+
+Whilst it's a bit grotty (for future multi-threading reports), we've consistently
+maintained an idiom of setting a static to indicate a current band, report etc.
+
+Alternatives:
+1) use flag for current redirecting layout render which can be used
+   by other nested block redirecting renders as desired
+   
+2) layout redirecting render violates the encapsulation of the wrapped render
+   and knows blocks types in detail - iterating them and working out positions
+   etc.
+
+DECISION - 1)
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/05
+REDIRECTING RENDERERS FOR BLOCKS IN LAYOUT BANDS
+
+Something to decide - how to prevent an explosion of classes due to 
+different block renderers.
+
+There was some discussion of this issue on 99/11/19 with the suggestion of
+a text interface allowing for text blocks to have multiple fields.
+
+The alternative is to have separate redirecting renderers and edit links
+for each block type - a combinatorial explosion. This would also require 
+some means of subclassed edit links cooperating with an overall layout
+band edit link (provides the navigation between blocks).
+
+DECISION - implement simple interface only for text blocks but able to 
+edit separate parts of split block.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/05
+REDIRECTING RENDERERS FOR BLOCKS IN LAYOUT BANDS - LOCATION STRINGS
+
+Most text blocks are not associated with named fields and neither are their
+layout bands named.
+
+It would be possible to extend the report writer to name different areas 
+(eg: first page header, band 3, block 2) but these automatic names will not
+always make sense to a user. The common idiom of a header to an empty view band
+being used to provide a layout report would give fairly meaningless names.
+
+Thus automatic names would need to be supplemented with manual naming of 
+report objects to be worth implementing.
+
+DECISION - leave blocks unnamed as far as location goes unless there is
+an obvious explanation (eg: page number blocks)
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/05
+REDIRECTING RENDERERS FOR BLOCKS IN LAYOUT BANDS - MAPPING TO GRID
+
+On 99/11/19 we referred to the unresolved issue of mapping into grids. Now
+that we know the current layout redirecting render we can have the same
+pattern carried down to the block level. At the point of wrapping a block,
+after drawing it, we can call the current layout redirector to tell it that
+we moved down a row.
+
+Alternatives:
+1) blocks call layout redirector to say they've moved down a row, with the
+   layout recording which block starts the row
+
+2) try to deduce transitions by comparing current positions
+   (major weakness - if a pict block which we don't record was to the left,
+   the next text block position may be diagonally below and harder to tell).
+   
+This covers the gross block level but unfortunately each block may represent
+a variable number of horizontal cells (typically 1 or 3). At which level will
+this conversion from one block to Nth cell in Xth block occur?
+
+Lets look a little more closely at the forces involved:
+f1) we have to map a known drawing location to at least the level of a block
+    and preferably to the cells within a block
+    
+f2) the interaction map stores row/col coordinates used to initiate editing
+
+f3) the base editing class OOF_mixRepAbstractCellEditor::GoToAnotherCell
+    limits movement based on the col and row counts returned by the 
+    oofRepEditLink and implicitly expects the setCurrentCoords
+    to accurately update that.    
+
+From forces 2 & 3 it seems clear that the responsibility of the edit link
+is to relate an "expanded" row/col coordinate to a cell within a block.
+
+Note that whilst the page interaction areas for a given layout object
+are obviously generated per page, they can point to a common edit link.
+
+This implies we can make the setup of the edit link relatively expensive.
+We are not concerned about (for example) layout bands in page headers
+going through this setup once per page.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/05
+EDITING GRAPHS
+We can easily add a simple editor for graphs which treats an entire graph
+as just presenting the view of the data, not allowing for editing the titles
+etc. within the graph.
+
+Alternatively, a graph edit link could treat the titles as the first row,
+similarly to one alternative discussed below for view bands.
+
+Don't forget some graphs have multiple views so we need to decide whether they
+are alongside or below.
+
+One unknown issue is when to redraw graphs - what are the side effects of
+editing the data and recreating them.
+
+DECISION - for now leave graphs uneditable
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/06
+GETTING BLOCK COORDINATES ON DIFFERENT PLATFORMS
+
+oofRepBlock renderers don't know the coordinates at which they are being
+drawn - just how to draw themselves after the layout band renderer has
+positioned our drawing environment.
+
+Changes to block renderers are complicated a little by them lacking a common 
+base, although it would be easy to insert a base below oofRepRender.
+
+To capture locations we DO need coordinates however.
+
+Alternatives:
+1) change the block draw() API to pass in drawing coords
+
+2) layout band renderers stash the current draw position before calling draw()
+   on a block. Blocks ask the oofRepLayoutRedirectingRender to add an area for
+   them and it can get the current coords from its wrapped oofRepLayoutBand_Render
+   
+3) oofRepBlockRedirectingRender has platform-specific #ifdef'd code to retrieve the
+   current coords, violating our principles of hiding platforms in reports
+   
+4) oofRepBlockRedirectingRender calls the environment which has code to retrieve the
+   current coords (environments inherently being platform specific)
+   
+Both 2) and 4) keep encapsulation boundaries and continue to hide the platform.
+However 4) is implicitly coupling via the assumption that the layout band has set
+the current drawing coords. If the layout band explicitly maintains its own cached
+drawing coords, this is much more rugged.
+
+DECISION - 2)
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/07
+FIX REPORT MOVEMENT TO COPE WITH IRREGULAR LAYOUT
+
+The original approach assumes a full grid however implementation of layout bands
+has shown that, particularly with multiple cells in page number blocks, it is
+common for some bands to have many more cells than others.
+
+We need both a policy to cope with moving into a shorter row as well as changes
+to how the request to move is satisfied.
+
+Looking at word processing engines rather than spreadsheets, a useful paradigm
+is to say if you move to a shorter row (ie: nobody directly above or below you)
+you end up at the end of the shorter line. 
+
+The unacceptable alternative is that the user can't always move directly up or down 
+because there is maybe just one cell shorter - they are not as likely to perceive 
+that lack as layout bands are not in a grid and so boundaries often don't 
+portray direct vertical relationships.
+
+It is thus obvious that an external rule can't be applied - we must evaluate the
+situation each time to see if can move in given direction from current location.
+
+The information and rules required to perform this evaluation must vary according
+to link type - there doesn't seem any sensible alternative to just querying the link
+to ask if we can move on from a given location.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/05
+EDITING VIEW BAND COLUMN HEADERS
+Initial thoughts:
+
+We need to know at the wrapping level if column headers are going to be
+drawn, or pull their drawing out separatelyly. This would be very difficult
+as they are often drawn as a result of a page break (ie: the first row on a page
+has the column headers).
+
+From a user perspective, the column headers could well be treated as a separate
+editing area - it would avoid mistakes in editing them instead of cell content.
+
+2000/01/09
+
+drawColumnHeaders is a oofRepViewBand_Render callback invoked by the draw() method.
+
+At the time it is called, a oofRepViewRedirectingRender will have already recorded
+the interaction area for the first row, at the y coord where the column headers start.
+
+This effectively makes the first row's interaction area the height of the row plus
+column headers.
+
+Column headers are simple items with constant strings and much closer to layout bands
+than view bands. 
+
+The alternatives for an editing interface are:
+1) special-case handling in the view link, so column headers look like an extension of
+   the view
+   
+2) a separate oofRepEditLink for them like a layout band
+
+Option 2) is vastly simpler and doesn't interfere with a working editing interface.
+
+However, if we have a separate edit link we now have one wrapper (the View wrapper)
+creating two edit links - who owns that link and how often is it created?
+
+If the View wrapper owns that link it can use that pointer as a flag to indicate
+the link needs to be created. Like layout bands used in page headers, we don't 
+necessarily have to create a new link for every time the column headers appear.
+
+DECISION - 2)
+
+The main difficulty is knowing exactly how to create the editing interface 
+and compensate the existing areas. There is an assumption that interaction areas
+are at increasing coordinates down the page.
+
+When we first draw a table, column headers will be drawn after one row of
+interaction areas have been recorded.
+
+When there's a page break, oofRepEditingEnv::resumeBandOverPage will have similarly
+replicated the interaction areas from the broken area on the bottom of the previous
+page.
+
+Either way, we can assume one row of areas exists.
+
+The alternatives:
+a) in drawColumnHeaders, search for the preceding row of areas and
+   change them to point to a column header edit link, adding a replacement row.
+   
+b) ignore it all - leaving column headers uneditable
+
+c) change the way we append areas so it's delayed and column headers would be
+   added before normal areas.
+   
+Option 3) doesn't seem straightforward enough to implement without major changes
+to drawing logic due to the timing of how we opportunistically draw headers.
+
+DECISION - a)
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/10
+EDITING JOIN KEYS AND OTHER FIELDS
+
+There is a distinct problems in some database applications if join keys are
+published in reports - editing their value can cause different related records
+to be displayed.
+
+The decision to make a field editable is in user-overridable class oofRepViewEditLink
+and so an application can implement a fancy solution - we want a reasonable default.
+
+Deducing if a field is a join key is a complex exercise in the current OOFILE
+as any relationship hard-coded on a table may refer to that field as the join
+key. In future versions this may be even more suspect - we may allow temporary
+joins, particularly to support SQL.
+
+It is desirable for applications to have a simple interface to control editing
+without having to subclass anyway.
+
+Alternatives:
+1) add the simple interface to control editing and leave it up to an
+application to explicitly disable join keys.
+
+2) Make join keys disabled by default, involving a larger startup
+   overhead for reports and probably core OOFILE changes.
+   
+DECISION 1) should suffice and is much simpler.
+		
+see revisit 2000/02/27
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/12
+MAKE EDITED COLUMN HEADERS APPEAR ON REDRAWN REPORT
+
+A past (reasonable) assumption has been that the report headers are
+constants and so can be processed once when a render is created
+(eg: oofRepViewBand_MacRender::finishConstruction).
+
+This is no longer true - we can edit column headers so the value will
+change after finishConstruction().
+
+The question is - how do we force a rebuild?
+
+The call of oofRep::draw() triggered by reflowing an edited report will
+not go through finishConstruction - it has all the original render objects
+and the only thing changing is how they will flow over the pages (with 
+presumably changed data).
+
+Column Headers may wrap to multiple lines. We want to avoid side effects 
+from code that assumes they stay the same height - recalculating them
+after other positions set would be dangerous.
+
+That height is used in oofRepViewBand_MacRender::draw() (and similar) to 
+decide if the current row and headers will fit this page. Thus we
+can't delay recalculating the size until the drawColumnHeaders callback.
+
+A good preceding location is the startTableBody() method for either
+the oofRepViewBand or its render object.
+
+If we do it at the render level we can keep the recalc logic totally
+within the editing classes, using oofRepViewRedirectingRender::startTableBody
+to make the decision.
+
+The only other alternative is to recognise that user code may one day
+want to dirty column headers for some other reason and put it at a 
+higher level.
+
+The recalculation logic will be as much work regardless.
+
+DECISION - make oofRepViewBand implement the triggering and flag
+but avoid adding virtual methods - just pass as flag so render can
+decide if it reacts
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/12
+EDIT VALIDATION ISSUES
+
+There are a few possible issues with entry of data through the 
+report-writer interface. Currently this interface is NOT used
+for data entry so can be a little more relaxed.
+
+There has been a long-standing problem with entering too large data
+for a dbChar field. An easy way is to permit entry of truncated data
+and restrict the error message (which was non-fatal) to debug mode
+only so application releases still work.
+
+This provides adequate feedback to the user - they see only a portion of the 
+data in their preview window. Whilst the edit controls used don't allow
+limiting data entry (the large text control lacks this) a simple fix
+is required and this seems OK.
+
+Number and date entry will end up with a null value if the user types
+inappropriate strings - this again will be visible in the preview.
+
+We lack the validation of duplicates performed in dbFieldLink::validToLeaveForm
+but as data is buffered locally and not updating indices, this will not
+be a problem.
+
+Anyone disabling the bufferForever mode used to stop changes going
+back to the database will have to deal with these issues!
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/14
+WINDOWS BUG REPORT - EDITING TRIGGERED WHEN OPEN REPORT
+
+Observations
+1) Opening reports within a preview window often triggers the LButtonOn event
+
+2) Opening reports with the external Open command in KM also triggers the LButtonOn
+event
+
+3) in both cases, using keyboard navigation of the Open dialog avoids the triggering so
+the conclusion is that a spare LButtonOn is floating around
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/14
+WINDOWS BUG REPORT - OPENING NAMES WITH APOSTROPHES
+
+Observations:
+1) "Teacher's Name" displayed as "Teacher  's Name" in a KMR doc,
+
+2) XML generated OK - Teacher&apos;s Name
+
+3) Opening that file with our Sample Reports works on Mac
+
+4) Opening that file with our Sample Reports displays the spacing bug on Win
+
+5) Confirmed expat source same on Mac and Win
+
+Problem identified as two bugs
+a) our OOF_XMLrepLayoutParser::charData doesn't append data the same as the 
+   dataParser - it makes the assumption that a single callback is ALL the data
+   for a block or column header. This means any column header or block in a layout
+   that contains linebreaks or the encoded chars (apostrophe, ampersand, less-than, 
+   greater-than or quote) will end up as several blocks. This implies that they will be 
+   several blocks when editing in the report preview as well as appearing slightly 
+   separated on Windows due to bug b)
+   
+b) the Windows layout is not quite butting sequential blocks up against each other
+   due possibly to measurement roundoff
+   
+Possible fixes for a):
+1) just hack for text blocks appending incoming text
+
+2) keep the text being appended until the end element and create the report items
+   based on state
+
+   
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/14
+WINDOWS BUG REPORT - OPENING KIDMAP TEACHING PLAN
+
+Observations
+1) Opening some KMR reports fails to draw correctly on opening.
+
+2) Opening these reports after drawing another report works.
+
+Unable to test in current Sample Reports architecture as it doesn't allow a blind Open.
+
+
+   
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/16
+BUG - ASSERT RESETTING ID'S WHEN SAVE REPORT THAT'S BEEN OPENED FROM DOCUMENT
+
+The original intent of this assert was to guarantee ID's weren't reset with
+a changed value during writing.
+
+Report ID generation takes place in the same sequence deterministically so if
+the report structure doesn't change, the ID's will be the same.
+
+However, it is possible in the current version to have a report structure
+vary slightly as a result of import. Even more importantly, in future, it may
+be possible to add report elements which would be guaranteed to break this 
+way.
+
+Alternatives
+1) zero all ID's at appropriate location after reading in report
+
+2) simply remove assert - this runs the risk that the assert is placed
+   for other than paranoid reasons and that subtle bugs may result
+   
+3) fix current processing so ID sequence guaranteed to regenerate the same,
+   still having problems if future versions allow structural change
+   (even adding changes as simple as adding text styles could cause change)
+   
+DECISION - 1) seems safest in terms of potential bugs and future-proof
+      
+  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/17
+BUG - PAGE SETUP CHANGES TO ORIENTATION PRIOR REPORT NOT SHOWN IN REPORT
+
+Windows OOFILE reports have the oofAfxDoPageSetup function going back
+to the early days. However, this doesn't appear to set the global page
+setup - hence our retrieval of page orientation later gets the wrong 
+values.
+
+oofRepWinGUIPreviewMFC::setPageSetup sets the mPaperRect which defines the 
+report dimensions and is read through the pageRectPts function.
+
+We assume oofAfxDoPageSetup is at least setting an application-wide 
+default setting (current thread driver instance?) because calling
+it from within different windows shows persistent changes in orientation.
+
+The failure is therefore the failure of the printer setup code in the reports
+to read those settings.
+
+oofRepWinGUIPreviewMFC ctor has a page setup passed in from the oofRepWindow
+ctor which just sets some basic fields. However, leaving this as null so 
+the ctor uses ::PageSetupDlg to init the structure we still have a portrait
+orientation - not seeing an application-level change to landscape.
+
+Removing the PSD_RETURNDEFAULT flag from the call to ::PageSetupDlg we see that
+the portrait orientation (default for driver) is still there. Changing the 
+setting at this point does the right thing - somewhere between oofAfxDoPageSetup
+and the report ctor we are losing this default setting.
+
+Maybe the difference is something that the CPageSetupDialog does - thought it
+might be the lpfnPageSetupHook but removing that has no effect.
+
+Problem identified with more accurate tracing - the editing redirecting environment
+causes the default case to be used when it creates a new oofRepWinGUIPreviewMFC
+and so ignores the earlier one which got the page setup correctly.
+
+Alternatives
+1) improve the default case handling
+
+2) when we get a page setup, hang onto it in a static variable
+
+Decision - try just 1) and combine with 2) if insufficient
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/17
+BETTER CLICK DETECTION WHEN NON-EDITABLE AREAS ON REPORT
+
+When reports include picture blocks or bands or, more usually, graph bands, there
+are large visible objects which are non-editable.
+
+This is not a problem, but our current click detection is "last item above and to left"
+gets the click.
+
+This means from the user perspective - clicking on a graph will return a layout block
+or cell from a preceding view. There are similar but less important issues with
+space and line bands.
+
+We already allowed for possible height and width detection by storing those
+values. What's needed is more accurate recording.
+
+For layout bands, as their components are fixed height and width, recording those
+values is trivial.
+
+For cells in view bands, we generally don't bother trying to record the height as
+they draw and work out their height after the band is recorded (and a given row of
+data may generate multiple cells vertically if it goes over a page boundary or two).
+
+Alternatives:
+1) default redirecting render terminates previous view row (layout bands will of 
+   course effectively terminate by adding new items to hit)
+   
+2) the last view row automatically sets its height
+
+The latter is likely to be inadequate - imagine a graph band in a break so it 
+occurs after every parent record. Just setting the height of the last row in the
+view will not cater for this.
+
+Decision - 1)
+
+Further insight from implementation:
+
+Our hit-test loop works on the basis that multiple positive returns will occur.
+If areas don't have width and height, anything below and to their right is a hit.
+
+Thus we can't just adjust the last row of a view band as a "barrier" to seeing
+clicks on a following graph. The earlier rows of the view will already have
+returned true.
+
+Alternatives:
+a) adjust all rows with zero height so none will see the click
+
+b) change the hit-test loop to allow for a "non-hit" to wipe earlier successes
+
+Decision: a) is a little more processing but simpler to implement and more 
+intuitive in the matching from now on.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/22
+ASSERT DUE TO GOING OVER PAGE ON COMPLEX REPORTS
+
+An assert to assist in the debugging of non-editable areas (that limit
+height of preceding interaction areas) has been triggered by a complex report
+and shown up another bug.
+
+The logic to provide carry on over a report page break by splitting an
+interaction row is buggy - it adds a cell for a single column, not all
+those in the row, and the y coordinate is not updated.
+
+This hasn't been noticed because it appears to be utterly redundant - using
+our interaction logging shows that we are adding correct detection areas
+for the top row of the broken area and testing confirms they work.
+
+The main area of puzzlement as to why they work is that they get the
+correct row for the editing. However, looking at our code
+theView->recordNumber() is used to supply the row and so we can safely
+drop this entire provision!
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/22
+WINDOWS SCALING ISSUES ON CLICK DETECTION
+
+Testing with a Windows app at different screen resolutions shows radically 
+different clicking positions.
+
+Alternatives
+1) work out empirical compensation formula for variety of resolutions
+
+2) spend a lot of time determining what factors are causing the variation
+
+DECISION - we lack the time to adopt 2) so if 1) can be made to work
+
+Later - reviewing diaries looking for discussions of 96dpi and further
+testing led to the discovery that NT has a relationship between
+the screen res and the ratio of 32000/2540 being the width of a 15" screen
+in 100mm units / number 100mm units per inch. (IE: width of 15" screen
+in inches).
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/22
+FIX WINDOWS CRASH EDITING IN RELEASE MODE
+
+Invoking editing in release mode builds causes a crash somewhere to do with
+dbGUIAdaptCWnd being called. The initial call to readOnly causes a crash
+but if that is skipped, data is not correctly written back.
+
+The bug is not dependent on old or new ANSI streams - it occurs in Mercator's
+KIDMAP which uses old streams as well as our sample reports with new streams.
+
+There are no bugs in debug builds?
+
+How to debug?
+
+The bug can be replicated if a release build is used with a debug version of
+the report libraries (can't combine debug version of the MFC libs due to
+other library conflicts).
+
+Idea - try the "Debug All Source" target which doesn't use libraries and see
+what we can do to slowly permute it.
+
+- just adding NDEBUG as a global definition (disables assert) - still works
+- remove _DEBUG and OOF_USE_ANSI_STREAMS=0 - still works
+- tried to build with OOFMFC_STATIC removed but unable to build
+- leave debug info but enable optimization max speed (same as release)
+
+Solution - add _AFX_NO_DAO_SUPPORT preprocessor definition to application
+(and ensure RTTI enabled).
+
+Found by taking release version which crashed regularly and using locally
+included source for just the GUI, disabling the GUI release library.
+
+The included GUI source couldn't be compiled without _AFX_NO_DAO_SUPPORT
+and RTTI enabled.
+
+_AFX_NO_DAO_SUPPORT was missing from Mercator's KIDMAP.
+
+I don't know why (lack of time to work out) this is needed for a release
+build now but debug builds are happy without it!
+
+However, further testing with Mercator's KIDMAP has revealed occasional
+crashes. It is not yet clear if this is related to the same bug.
+
+2000/01/25
+More tests and user communications enabled the bug to be replicated
+in Sample Reports release mode. It is now characterised by a crash
+during the processing after OKing or Cancelling the edit dialog
+when content has been changed. It may not be replicable in the first
+of the sample reports but easily in the 2nd.
+
+Ideas 
+- due to deleting the Adapter before the edit dialog? - NO
+- tests commenting out code proved its the PostMessage causing the crash
+- test just return from the ReflowReport method - still crash
+- tried moving PostMessage out after the DoModal call - still crashes
+- removed dialog creation call altogether - react to click with MessageBox
+  - crashes after SECOND click, first works!
+  
+Realised from studying message map TN006 that ON_MESSAGE map macros
+expect a given function signature bu there is no compiler type checking
+to enforce this!
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/25
+FIX FAILURE OF WINDOWS PREVIEW WINDOW TO SENSE CLICKS > 1ST PAGE
+
+Quick tracing revealed the page map being looked up for clicks was the
+first page always as ordinalPageNumber was returning zero.
+
+This is due to the oofRepWinGUIPreviewMFC environment storing the page list
+but never updating an index - it uses readOnly page(n) retrievals when
+drawing the current page.
+
+Alternatives
+- add a feature to OOF_ExpandableLongArray so that you can set the current
+  iterator (other than by iteration) and do so when drawing pages
+  
+- track the current page with a member var directly in the env
+
+Decision - the second one is vastly easier and has more limited impact
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/02/27
+EDITING JOIN KEYS AND OTHER FIELDS - AUTOMATICALLY MORE RUGGED & FASTER 
+
+In practice, the decision to leave controlling editing for join keys in the hands of
+user programmers was a failure - there have now been several bug reports which appear
+to be based on join keys being edited.
+
+Let's look again at making join keys automatically editable and also cutting down the
+overhead when initiating an edit.
+
+oofRepViewEditLink::getCellText currently tests both
+	const bool canEdit = !theField.fieldIsVirtual() && !Drawable()->fieldIsNonEditable(col); 
+
+
+The expectation was that users would override to also make non-editable in their
+own startup logic, calling oofRepViewBand::setFieldNonEditable in the report definition.
+
+The test for canEdit above invokes virtual function call on every edit load as well
+as the inline lookup of the flag. This is unnecessary - preprocessing can perform the
+fieldIsVirtual test and then call setFieldNonEditable so we cache the result. (Fields are
+NOT going to change their virtual status in report runtime).
+
+Similarly, can we evaluate if a field is a join key reasonably efficiently so it is
+done in a startup pass?
+
+If we are doing this in an overall pass we can just query the relationship fields - the
+problem as perceived before was that this was a major effort to undertake starting at
+the field being edited and would require core logic changes. A scan going over the fields
+of a view can evaluate this externally so only involves report-writer changes.
+
+We can take this opportunity to provide another user-overrideable hook for 
+configuring editing. We currently invoke in oofRep::draw an oofRepVisitor which is
+used to set the bufferForever mode that prevents edits going back to the database
+- OOF_repBufferSettingVisitor.
+
+If the oofRepEditor returned this visitor then that provides another override hook and 
+we can process a single pass through the databases of the report to setup the editable
+status.
+
+Alternatives:
+1) leave current situation and advise application programmers that it's their bug
+
+2) enhance the report setup visiting as described above with a visitor that sets
+   editable state in advance
+   
+3) add a runtime test of each field to see if a join key
+   (very expensive)
+   
+DECISION - 2)
+
+   

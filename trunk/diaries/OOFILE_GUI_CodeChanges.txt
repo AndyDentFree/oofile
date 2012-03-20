@@ -1,0 +1,535 @@
+OOFILE_GUI_CodeChanges.txt
+
+Created when the GUI model was amalgamated, starting with rewrite of PowerPlant
+see OOFILE_PP_CodeChanges.txt
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/10
+FINISH  NEW GUI AND MOVE TO PLATFORM-INDEPENDENT SOURCE
+
+FILE	oofgui.h, oofgui.cpp
+- created to contain platform-independent classes
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/17
+NEW GUI FINE-TUNING
+
+CLASS	dbGUIAdapter
+Method	readOnly
+		- added empty virtual
+		
+		
+CLASS	dbGUIAdaptEditPane, dbGUIAdaptLControl
+Method	readOnly
+		- added override to disable/enable panes
+		
+		
+CLASS	dbFieldLink
+- mDisableReadOnlyPanes removed
+
+Method	ctor
+		- don't pass in param for disableReadOnlyPanes		
+
+
+CLASS	dbFieldLink
+Method	linkIsEmpty
+		- fix bug (always returned false) and reimplement using adapter
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+ADD VERSION DEFINES TO ALL OOFILE PACKAGES
+
+FILE	oofgui.h
+- add OOFVERS_GUI
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/24
+FINISH NEW GUI - DEBUGGING LINKS
+
+CLASS	dbGUIAdapter
+Method	clone
+		- added pure virtual
+		
+Method	adaptsControl
+		- added virtual default imp returning false		
+		
+		
+CLASS	dbGUIAdaptControl
+Method	setString, copyString, equalsString
+		- implemented in terms of setValue, getValue, equalsValue
+
+
+CLASS	dbGUIAdaptEditor
+Method	editingOccurred
+		- added virtual with default imp to call mFieldLink->maybeDirty
+
+Method	setString, copyString, equalsString
+		- moved pure virtuals up to dbGUIAdapter as needed at that level
+		  for dbFieldLink to deal exclusively with dbGuiAdapter*
+		  
+
+CLASS	dbGUI
+Method	isOOFILEcommandEnabled
+		- added for use in PowerPlant apps - findCommandStatus		  		
+		
+
+CLASS	dbAbstractEditHelper
+Method	getLink
+		- removed use of obsolete dbFieldLink::linksTo and use
+		  dbGUIAdapter::adaptsControl to check if linked
+		  
+
+CLASS	dbDateLink2Editor
+Method	updateDerivedFieldDisplay, validToLeaveLink
+		- copied old dbDateLink and updated for new structure
+		
+
+CLASS	dbDateTimeLink2Editor
+Method	updateDerivedFieldDisplay, validToLeaveLink
+		- copied old dbDateLink and updated for new structure
+
+
+FILE	oofgui.cpp
+- added constant kRecordLockedByOtherUser				  
+
+
+CLASS	dbAbstractBrowseHelper
+Method	receiveMsg
+		- remove mDisplayTable-> from in front of highlightNothing and
+		  highlightRecNo calls as we can use our virtual methods
+		  
+		- remove case for OOFmsg_DeleteRecord
+		
+				  
+CLASS	dbGUIAdaptLControl
+Method	setFieldLink
+		- call base so member variable mFieldLink gets set
+		- pass 'false' in to AddAttachment as we are not owned by pane
+		
+
+CLASS	dbGUIAdaptEditPane
+Method	ctor
+		- remove call to AddAttachment		
+
+Method	setFieldLink
+		- call AddAttachment (so cloning fixes attachments also)
+		- pass 'false' in to AddAttachment as we are not owned by pane
+				
+
+CLASS	dbEditHelper
+Method	linkField(dbField*, dbGUIAdapter&)
+		- added body that creates a dbFieldLink and calls adoptLink
+		  (was stupid copy of others that call dbFieldlink so death spiral
+		  recursing to itself) depending on field type
+		- add isReadOnly param
+		
+Method	linkField(*, LCaption*)
+		- pass true to new 3rd param in main linkField call		
+
+
+CLASS	dbFieldLink
+Method	linkEqualsField		
+		- replaced base implementation which returned true with version using
+		  dbGUIAdapter::equalsString
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/23
+NEW GUI - USE GUI ADAPTORS IN MFC & COMPILE NEW GUI WITH VC5
+
+CLASS	dbAbstractEditHelper
+Method	linkAdapter
+		- added base common versions (was linkField in dbEditHelper)
+		
+		
+FILE	oofgui.h
+- removed #include <PP_Types.h>
+- put OOFGUI_EXPORT macro in front of all class definitions that lacked it
+
+
+CLASS	dbAbstractBrowseHelper
+Method	receiveMsg
+		- added case for OOFmsg_RevertRecord (copied from MFC dbBrowseHelper)
+
+
+CLASS	dbGUI
+moved PP implementations to oofgui.cpp without editing:
+- ConfirmDelete
+- newRecord
+- saveRecord		
+- deleteRecord
+- revertRecord
+
+
+CLASS	dbTableDisplay
+Method	highlightRow
+		- add bool 2nd param to match MFC usage
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/25
+MAKE HIERARCHICAL TABLES SUBSCRIBE TO GUI
+
+CLASS	dbAbstractBrowseHelper
+Method	ctor
+		- take a dbTable* param, not a dbView* as we don't use the view
+		
+						
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/25
+MOVE MORE FUNCTIONS INTO GENERIC GUI
+
+
+CLASS	dbGUI
+moved methods from PPlant to oofgui.cpp without editing:
+- ConfirmDelete
+- newRecord
+- saveRecord
+- deleteRecord
+- revertRecord
+- cloneRecord
+- GetDisplayTableHandler
+- isOOFILEcommandEnabled
+
+
+moved methods to oofgui.cpp, replacing Mac SysBeep with oofRuntimeEnv::beep
+- goFirstRecord
+- goLastRecord
+- goNextRecord
+- goPrevRecord
+
+
+CLASS	oofYNC
+Method	all except msgBox (ctors, dtor etc.)
+- move PPlant versions to oofgui.cpp
+
+Method	ctor()
+		- use MB_ICONEXCLAMATION to init mIcon, not MB_NULLICON
+				  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/28
+CLEANUP PRAGMAS AND VC5 COMPILE
+
+change check of MSC_VER to >=1010 so includes VC5 and
+add disable of warning 4800 (bool conversion performance warning) in:
+- oofync.h
+ 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/08
+DEBUG NEW GUI - PUT BACK A WAY TO HAVE STATIC CONTROLS ALWAYS READONLY
+
+CLASS	dbFieldLink
+- mAlwaysReadOnly added
+
+Method	ctor
+		- init mAlwaysReadOnly from the isReadOnly param
+		
+Method	copy ctor
+		- copy rhs.mAlwaysReadOnly
+				
+Method	readOnly
+		PreApprovedReadOnly
+		- check mAlwaysReadOnly to avoid messaging statics etc.
+		- don't bother changing if incoming state==currentstate
+		
+Method	alwaysReadOnly
+		- added inline getter for mAlwaysReadOnly
+				
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/17
+DEBUG NEW GUI - CONFUSING & BUGGY 'isReadOnly'
+
+rename param isReadOnly to becomeReadOnly to avoid confusion with method, in:
+- dbAbstractEditHelper::linkAdapter
+- dbAbstractEditHelper::readOnly
+- dbUshortLink::dbUshortLink
+- dbCharLink2EditField::dbCharLink2EditField
+- dbRealLink2EditField::dbRealLink2EditField
+- dbShortLink2EditField::dbShortLink2EditField
+- dbCharLink2TextEdit::dbCharLink2TextEdit
+- dbTextLink2TextEdit::dbTextLink2TextEdit
+- dbTextLink2Caption::dbTextLink2Caption
+- dbDateLink2Editor::dbDateLink2Editor
+- dbDateTimeLink2Editor::dbDateTimeLink2Editor
+- dbFieldLink::dbFieldLink
+- dbNumericFieldLink::dbNumericFieldLink
+
+
+CLASS	dbFieldLink
+Method	PreApprovedReadOnly
+		- fix BUG where isReadOnly method address (ie: no parens) inadvertently
+		  used because param named becomeReadOnly but body written as though
+		  param named isReadOnly
+
+
+CLASS	dbGUIAdaptEditPane
+Method	ExecuteSelf
+		- rename local isReadOnly to selfIsReadOnly to avoid confusion with 
+		  method IsReadOnly				
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/17
+DEBUG NEW GUI - ERRORS LEAVING FIELDS ON WINDOWS
+
+CLASS	dbFieldLink
+Method	setOwner
+		- renamed to owner
+		
+Method	owner()
+		- added getter 
+		
+
+CLASS	dbGUIAdaptCWnd
+Method	OnKillFocus
+		- get the owner, downcast to a dbEditHelper and call getLink to 
+		  lookup new link from the pNewWnd param so we can call maybeChangeField
+
+
+CLASS	dbGUIAdaptCCombo
+Method	OnMessage
+		- call maybeDirty for a CBN_SELCHANGE (was leaveLink, so not saving)
+		
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/03
+DEBUG NEW GUI - ERRORS LOADING RELATED TEXT FIELDS
+
+CLASS	dbFieldLink
+Method	copyFieldToLink
+		- restore old logic (previously just in dbTextLink2TextEdit::copyFieldToLink)
+		  that calls ensureRecordLoaded with true to auto-create related records
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/12
+ADAPTING CHECKBOXES & OTHER CONTROLS.
+CLASS	dbAbstractEditHelper
+Method	linkAdapter
+		- added case for boolFields, creating dbBoolLink
+		
+		
+CLASS	dbBoolLink
+- added, uses get/setValue to talk to adapters		
+
+
+CLASS	dbGUIAdapter
+Method	getValue
+		- added default using getString
+
+Method	setValue
+		- added default using setString
+
+Method	equalsValue
+		- added default using getValue
+
+Method	setString
+		- made non-const (including all subclasses) as it doesn't make sense
+		  for a setter to be const and future user subclasses may want to 
+		  record state changes in the adapter
+		  
+		  		
+CLASS	dbGUIAdaptControl
+Method	getValue
+		setValue
+		equalsValue
+		- removed as handled in dbGUIAdapter
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/08/08
+ROLL IN MERCATOR CHANGE - ALLOW OVERRIDE IN BROWSE HELPER
+
+CLASS	dbHierBrowseHelper
+Method	insertItemsBelow
+		- made virtual
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/10/02
+PREVENT MESSAGES ABOUT INVALID FIELDS WHEN CANCELLING RECORD
+(ROLL IN MERCATOR REQUEST)
+
+CLASS 	dbAbstractEditHelper
+Method	LeaveRecord
+		- only check CanSaveRecord inside isDirty() and after CanSave
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/10/03
+SUPPORT EDITING TABLES IN DIFFERENT SAVE MODES
+
+CLASS	dbAbstractEditHelp
+Method	ctor
+		- init mAutoSaveOnMoving based on tbl->tableCachesDirtyRecords().
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/20-22
+USE GUI FIELD LINKING TO EDIT CELLS IN REPORTS
+
+CLASS	dbFieldLink
+Method	ctor
+		- cope with null mAdapter
+		
+Method	readOnly
+		- don't do nasty downcast of dbHelper to dbAbstractEditHelper
+
+Method	tellGUIcareAboutLocking		
+		- made virtual
+		
+Method	isDirty
+		- return mMaybeDirty instead of true, so can keep using local status
+		  when a link doesn't have a field		
+
+Method	readOnly
+		- cope if doesn't have a table (previously asserted)
+
+Method	copyFieldToLink
+		copyLinkToField
+		- added assert(field()) to ensure not called in dangerous circumstance	
+				
+		
+CLASS	dbHelper
+Method	table
+		- added default virtual returning NULL
+
+
+CLASS	dbAbstractEditHelper
+Method	table
+		- made virtual and non-inline				
+		
+
+CLASS	dbAbstractBrowseHelper		
+Method	table
+		- added to return view's table
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/22
+FIX BUGS - SIZE OF FIELD NO LONGER LIMITS ENTRY
+
+CLASS	dbGUIAdaptEditor
+Method	setTextEntryLimit
+		- added empty virtual
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/12
+SUPPORT WINDOWS REPORT EDITING
+
+CLASS	dbGUIAdaptCWnd
+Method	OnKillFocus
+		- change assert after dynamic cast to dbEditHlper
+		  to an if() so it copes if using oofRepEditLinks which 
+		  are links but not to editHelper
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/20
+FIX CRASH IN RELEASE MODE WINDOWS REPORT EDITING
+
+CLASS	dbGUIAdaptCWnd
+Method	setFieldLink
+		- remove ASSERT macro that checks if non-attachable link objects
+		  are CStatics. Our sample report uses a CEdit
+		  
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/09/10
+FIX MINOR BUG NOTICED WHILST CONVERTING TO CODEWARRIOR PRO6 - FAILURE TO GET VALUE
+
+CLASS	dbGUIAdapter
+Method	getValue
+		- was calling convertNumber instead of asLong so returning 
+		  arbitrary number
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/09/21
+FIX BUGS NOTICED IN PREPARATION OF SAMPLE "OOFYNC DEMO"
+
+CLASS	oofYNC
+Method	msgBox  _Macintosh
+		- init pic ID to 0 so default cases have no pic
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/10/20-22
+MERGE DAVID CARBONISED  & SERVER-AWARE BRANCHES
+
+
+CLASS	dbGUI
+Method	newRecord
+		changedSelection
+		- call beginTransaction
+
+Method	leaveRecord
+		- commit or abort the transaction
+		
+				
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/19-21
+ADD RELATED DATA ENTRY VIA POPUPS
+
+CLASS	dbAbstractEditHelper
+Method	linkPickAdapter
+		- added to create a dbFieldPickLink
+
+Method	maybeChangeField
+		- renamed as maybeChangeTargetLink because earlier name suggested
+		  it was about reacting to data modification. (Yes, I got confused
+		  when reading the code!)
+		- made virtual
+
+Method	updateDerivedFieldDisplays
+		- made virtual
+				  
+				  
+CLASS	dbFieldLink
+Method	leaveLink
+		- made virtual
+		
+Method	copy ctor
+		- allow NULL adapter, as oofRepEditLink subclass may
+
+Method	copyFieldToLink, copyLinkToField
+		- add assertions to guard against NULL adapter				
+
+		
+CLASS	dbFieldPickLink
+- added subclass of dbFieldLink
+
+
+CLASS	dbGUIAdapter
+- mIsValuePicker added
+
+Method	ctor
+		- init mIsValuePicker(false)
+
+Method	isValuePicker
+		- added inline getter
+		
+Method	setValueList
+		- added empty base method
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.4 PUBLIC RELEASE
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+		

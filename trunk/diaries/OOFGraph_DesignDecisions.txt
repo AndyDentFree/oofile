@@ -1,0 +1,260 @@
+OOFGRAPH DESIGN DECISIONS
+96/05/29
+CLASS	GEO
+
+The DrawSelf() routines for each individual geo have a great deal of repeated
+code, relating to the setting up of the foreground and background colours and
+the pattern for drawing.
+
+Solution?:
+
+Push this code back to the geo base class.
+
+There are two competing ways of doing this: the PP and TCL methods.
+
+The PP method:
+-=-=-=-=-=-=-
+
+Parent::Draw()
+{
+	Setup();
+	DrawSelf();
+}
+
+Parent::Setup()
+{
+	// do the setup
+}
+
+(virtual)
+Parent::DrawSelf()
+{
+	// do nothing
+}
+
+Child::DrawSelf()
+{
+	// do child-specific draw stuff
+}
+
+Pros:
+Writer of child classes does not have to remember to call Setup() each time
+he/she writes code for DrawSelf().
+
+Cons:
+Inflexible:: Parent::Draw() is always called before any code declared in
+Child::DrawSelf().
+
+The TCL method:
+-=-=-=-=-=-=-=
+
+(virtual)
+Parent::Draw()
+{
+	// do nothing
+}
+
+Parent::Setup()
+{
+	// do the setup
+}
+
+Child::Draw()
+{
+	Setup();
+	// do child specific draw stuff
+}
+
+Pros:
+Flexible: some child specific draw stuff can be called before Setup()
+
+Cons:
+Writer of child classes must remember to call Setup() for each Draw() for each
+child class.
+
+Decision:
+-=-=-=-=
+
+Use the PP method. I can't think of any code that a child would need to call
+before a call to Setup(), so inflexibility is outweighed by the issue of
+safety.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+29 May 1996:
+-=-=-=-=-=-
+
+Two separate patterns?
+-=-=-=-=-=-=-=-=-=-=-
+
+The user may want two patterns - one for color and one for black and white.
+Should there be two patterns: one which associates with the colour rendition of
+a geo, and one which is the substitute for *both* of these for the case where the
+devise on which the geo is to be displayed (screen, printer) is mono. Obviously
+the subtitute pattern will be a substitute for the original colour only (not
+the colour/pattern combination) - does this make sense?
+
+Changes necessary to accomodate new concept: oofDrawStyle.
+
+oofDrawstyle is a structure that will be used to replace the existing
+oofPattern. oofDrawstyle consists of the following elements:
+
+oofColor foreColor
+oofColor backColor
+oofPattern* colorPattern
+oofPattern* monoPattern
+
+We should use pointers to patterns so that later, if we decide to use fancy
+patterns we make the tarnsition easily.
+
+Colors are unlikely to change and are also very lightweight, so they can be
+concrete.
+
+30 May 1996:
+-=-=-=-=-=-
+
+Flag for mono/colour
+-=-=-=-=-=-=-=-=-=-=
+
+Each type that inherits from a geo must implement a function:
+	drawSelf(oofDrawStyle* inStyle);
+	
+The drawstyle passed in will be that of the graph, the series, or the
+individual geo, as appropriate (the function geo::draw() will determine which
+is appropriate. It then calls drawSelf with the correct drawstyle).
+
+The drawstyle passed in contains enough information to allow the geo child
+type to draw in either colour or mono.
+
+The question is: where should the function drawSelf() refer in order to find
+out whether to draw in colour or mono? Somewhere a flag will have been set
+saying "if you have to draw, draw in mono" or "colour". Where does this flag
+live?
+
+Flag in the DrawStyle:
+Pros:
+Geo child type only has to refer to the DrawStyle, which is something which is
+contained within it, rather than some structure which encloses a geo (like a
+graph), and which must forever thereafter exist for the class to work properly.
+Cons:
+Some geos could accidently be set to draw in mono and others to colour,
+resulting in weird display results (particularly on a mono device).
+
+Flag in the Graph:
+Pros:
+Once the flag is set, all elements of the graph can be guaranteed to draw
+correctly in either color or mono.
+Cons:
+Geos rely on the existence of a graph to correctly draw.
+
+Where should the flag which sets whether the drawing routine in the individual
+geos should use the mono or color pattern component of the drawstyle reside?
+
+Options:
+
+Put the flag at the graph level.
+
+6 June 1996
+-=-=-=-=-=-
+
+There is a third alternative, which is more attractive:
+
+Static Flag in the DrawStyle.
+Every time a a graph needs to draw, it checks a boolean mono flag. If the flag
+is set, a static function of DrawStyle sets a static boolean flag for the
+DrawStyle class, indicating that from now on all objects with a DrawStyle are
+to use the mono pattern. The graph then draws all its geos (these use a static
+accessor function of DrawStyle to determine whether the flag is set) and finally
+uses the static function of DrawStyle to set the flag back to indicate colour.
+
+This technique only works if drawing all the geos for a graph can be considered
+an atomic operation.
+
+Decision:
+Use this third alternative.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/29
+MAKE IT EASIER TO ADD GRAPHS TO REPORTS
+(see full argument in OOFRep Design Decisions)
+
+Decision:
+2) there's a way to detect if a graph has had setDrawStyles called
+
+this can be a simple boolean flag.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/31
+DRILL-DOWN AND CLICK DETECTION
+
+In the interests of expediency for the KIDMAP project we're only considering the ability to detect single or double-clicks rather than a full mouse-driven annotation and selection mechanism.
+
+WANTED:
+- detect a single or double-click on a graph window
+- attach a custom reaction to that event
+- know the series selected by the click
+
+The obvious approach is to attach a kind of abstract click handler to the graph. This allows the user to subclass to provide their own reactions.
+
+The graph pane will detect the click (platform-specific behaviour) and provide real coordinates to the graph. If a click handler is attached, the graph:
+- translates the real coordinates into ideal
+- works out the series clicked
+- calls the click handler with the series number.
+
+This mechanism provides a neat encapsulation to further extend detection to clicking on individual points, clicking on the axes etc.
+
+The only major point to decide is how to attach the click handler. As we don't make it easy to expose the series within a graph, it would be more work to attach a handler for each series, and of doubtful benefit.
+
+DECISION: a single click handler is attached to the graph as a whole.
+
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/13
+REMOVE WINDOWS RESOURCE LEAKS
+see OOFRep_Design_Decisions.txt for discussion
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/10/14
+GRAPH INITIALISATION AND FONT CONTEXT
+In the cleanup of fonts and the centralization of their allocation and
+selection, we have a problem now that graph finishConstruction is called
+early in a report context, and the current DC is not yet set.
+
+The alternatives are:
+- make setFontSize and selectFont able to operate cleanly with only an
+IC set
+- guarantee a DC by early initialisation in the report writer
+environment.
+
+We currently don't make any assumptions that operations in reports or
+graphs will be restricted to IC-compatible only. It thus seems dangerous
+to introduce this dependency.
+
+DECISION - create an early DC or pass one into the report environment.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/02
+DEBUG GRAPHS - FIX OVERLAY NAME IN LEGEND
+
+Reported as a bug - when using graph overlay views the name of the series
+appearing in the legend is the X axis title.
+
+On examination, the function oofGraphData::OverlayField which is used to supply
+the field from which the name is taken is ONLY used in this context.
+
+The function actually returns the WRONG field from the graph data!
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

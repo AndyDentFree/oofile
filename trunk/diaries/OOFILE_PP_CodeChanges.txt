@@ -1,0 +1,3314 @@
+
+This separate changes document tracks the Metrowerks PowerPlant integration classes.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/16
+STARTED IMPLEMENTING FROM NEW DESIGN, ABANDONING zApp ideas
+
+- minimal interface in oofpp.hpp, defines:
+CLASS	dbFieldLink
+- abstract parent of links that are customised for each pair of field type and valid PowerPlant control.
+
+CLASS	dbHelperFactory
+- abstract factory class - create a subclass for each user window or dialog that's created to talk to the database.
+
+CLASS	dbEditHelper
+- mixin class for dialogs editing database tables
+
+
+- specific link classes fully defined in oofppx.hpp:
+CLASS	dbCharLink2EditField
+
+CLASS	dbCharLink2TextEdit
+
+CLASS	dbTextLink2TextEdit
+
+CLASS	dbLongLink2EditField
+
+CLASS	dbShortLink2EditField
+
+CLASS	dbDateLink2EditField
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/21
+FINALISING STRUCTURE OF COMMUNICATING HELPER CLASSES
+
+CLASS	dbDocHelper
+		- can create windows using factory objects
+		- has ability to add a record independent of browser window
+
+CLASS	dbWindowHelper - parent for anything supporting windows onto OOFILE
+
+CLASS	dbEditHelper
+		- command filters in place for moving records
+
+CLASS	dbBrowseHelper
+		- handles command such as add, edit, del records
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/22
+BASIC LLISTBOX ENCAPSULATION
+
+CLASS	dbBrowserDisplay
+		- ABC for displays
+
+CLASS	dbListBoxDisplay
+		- concrete display wrapping an LListBox
+
+
+CLASS	dbBrowseHelper
+- add members mBrowserDisplay, mBrowsingView
+- added methods to use a dbListBoxDisplay
+	LoadBrowseData
+	AdoptView
+	BrowseViewWithListBox
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/25
+BUGHUNTING
+
+CLASS	dbBrowseHelper
+Method	OOFILEhandlesMessage
+		- use mBrowsingView->source() instead of mMainTable
+	      (which we aren't setting up and can probably drop, using just view!)
+
+
+CLASS	dbTextLink2TextEdit
+Method	copyFieldToLink
+		- use const_cast rather than relying on dbText::Operator Ptr()
+
+
+
+CLASS	dbCharLink2TextEdit
+Method	copyFieldToLink
+		- use const_cast rather than relying on dbChar::Operator Ptr()
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/26
+REFINING EDITING BEHAVIOUR
+CLASS dbEditHelper
+- added empty virtual methods:
+	EnteringAboutToLoad
+	EnteringAfterLoad
+	CanLeaveRecord
+	LeavingAboutToSave
+	LeavingAfterSave
+
+Method	SaveRecord
+	- call LeavingAboutToSave & LeavingAfterSave
+
+Method	LoadData
+	- added to wrap Entering.. methods around CopyFieldsToLinks
+
+Method	OOFILEhandlesMessage
+	- added cmd_OK and cmd_Cancel
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/31
+FIXING NAVIGATION & ENHANCING BROWSER LINKS
+FILE	oofpp.hpp
+- define constants for all our commands
+
+CLASS dbEditHelper
+- make all navigation methods beep if at end of selection
+	GoFirstRecord
+	GoPrevRecord
+	GoNextRecord
+	GoLastRecord
+
+Method	OOFILEhandlesMessage
+	- use new constants instead of hardcoded command strings (longs)
+
+
+Method	SaveRecord
+		- send mBossDoc->recordHasBeenChanged 
+		(will do more intelligent version later, that checks if fields dirty)
+
+
+CLASS	dbBrowseHelper
+Method	dbBrowseHelper
+		- register with doc via interestedInRecordChanges
+
+Method	OOFILEhandlesMessage
+	- use new constants instead of hardcoded command strings (longs)
+
+Method	recordHasBeenChanged 
+		- added to just call LoadData
+
+
+CLASS	dbListBoxDisplay
+Method	dbListBoxDisplay
+		- set the list message to cmd_dbDoubleClick
+
+
+CLASS	dbDocHelper
+- added (temporary, use list later) mInterestedInRecordChanges
+
+Method	recordHasBeenChanged 
+		- added to just forward call to mInterestedInRecordChanges
+
+Method	interestedInRecordChanges added
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/09/10
+REFINING FRAMEWORK, TO POLISH UP APPMAKER GENERATION
+
+Constants
+cmd_dbAdd renamed to cmd_dbNew for consistency
+
+CLASS	dbListBoxDisplay
+Method	loadData
+		- set the list value to 0 when finished so always selected
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/09/12
+IMPROVING LISTS
+CLASS	dbListBoxDisplay
+Method	dbListBoxDisplay
+		- call SetColWidths
+
+Method	changeViewTo
+		- call SetColWidths
+
+Method	SetColWidths
+		- added to divide listbox cells evenly amongst cols of view
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/09/20
+MINOR FIXES
+CLASS	dbDocHelper
+Method	NewRecord
+		- check mAddFactory before trying to call it!
+
+Method	MakeEditor
+		- check mEditFactory before trying to call it!
+
+Method	MakeBrowser
+		- check mEditFactory before trying to call it!
+
+
+
+CLASS	dbListBoxDisplay
+Method	loadData
+		- call Hide() and Show() around updates, for cleaner effect and to avoid 
+		  problems with listbox being redrawn in system font rather than it's 
+		  specified font
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/09/30
+FIXING BUG WITH RACE CONDITION WHEN EXIT DIALOG VIA MOVEMENT BUTTONS
+CLASS	dbEditHelper
+Method	destructor
+		- delete the mMainTable which is a smart-pointer copy of the table. 
+		  (created in the user's SetDatabase method)
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+CHANGE TO VIRTUAL BROWSER
+ 95/10/07-10
+
+CLASS	LStrTableView
+		- added as subclass of LTableView, which overrides DrawCell (as all 
+		  must) with a version which draws plain text (Note: this is not 
+		  inherently an OOFILE class)
+
+
+CLASS	dbViewAsTableStorage
+- added simple subclass of LTableStorage abstract, which provides data direct from the database.
+
+
+CLASS	dbBrowseHelper
+Method	recordHasBeenChanged
+		- don't call LoadBrowserData but directly refresh browser
+
+Method	RefreshBrowser
+		- added to call mDisplay->Refresh
+
+CLASS	dbTableViewDisplay
+Method	loadData
+		- calls mDisplay->Refresh after setting storage
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+FIX LISTBOX - "off-by-one" ERROR DOUBLE-CLICKING LAST ROW
+95/10/26
+CLASS	dbListBoxDisplay
+Method	loadData
+		- call mView->source()->start(); again after loading all data, as a hack 
+		  because gotoRelativeRecord() is not coping with the case after having 
+		  iterated through the entire selection.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+FINE-TUNE dbTableViewDisplay FAMILY
+95/12/13
+CLASS	dbTableViewDisplay
+		- mStorage added (cache this so we don't keep creating & leaking)
+
+Method	loadData
+		- create mStorage ONCE
+
+
+CLASS	dbBrowseHelper
+Method	recordHasBeenChanged
+		- just call RefreshBrowser (was directly calling refresh on mDisplay)
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+FIX BUG WITH COPYING BACK TEXT EDIT FIELDS - GETS TRAILING GARBAGE
+96/03/23
+CLASS	dbCharLink2TextEdit
+Method	copyLinkToField
+		- get the TEHandle and use that to get the actual length of the field, 
+		  as the blind handle used for text storage still has the trailing 
+		  characters if the last thing the user did was delete trailing chars.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+IMPROVE REPORTS & EASE OF GRID OUTPUT - ADD LEN & OUTPUT METHODS
+96/04/16
+CLASS	dbViewAsTableStorage
+Method	GetCellData
+		- use getChars directly onto table buffer, instead of CopyAsChars, then 
+		  copy again.
+		
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+USE LTEXTTABLEVIEW FOR BROWSING
+96/04/21
+CLASS	LTextTableView
+Method	GetValue
+		- use new LTableSelector::GetFirstSelectedCell method (converting from 1-based
+		  selection to 0-based row value)
+		
+		
+Method	SetValue
+		- deselect all cells and select first cell on row (converting from 0-based
+		  row to 1-based selections)
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+GUTTING OF OLD CLASSES
+96/04/27
+Removed
+- dbWIndowFactory
+- dbWindowHelper
+- dbDocHelper
+
+CLASS	dbHelper
+- added simple subclass of dbReceiver that knows how to Rebroadcast via a dbRebroadcaster
+
+
+CLASS	dbBrowseHelper
+- no longer subclass of dbWindowHelper
+- now subclass of dbHelper
+- make ctor public - don't expect to use as mixin
+- renamed as dbTableHelper
+
+Method	ctor
+		- don't register with mBossDoc as interested in rec changes
+		- take dbView param & use dbSource::table()
+
+Method	browseViewWithListbox
+		- call LoadBrowseData at end (previously relied on user to call via
+		  changeViewTo
+
+Method	browseViewWithTable
+		- call LoadBrowseData
+
+
+
+CLASS	dbEditHelper
+- no longer subclass of dbWindowHelper
+- make ctor public - don't expect to use as mixin
+
+Method	ctor
+		- take dbTable param
+
+Method	SaveRecord
+		- don't call mBossDoc
+		- call Rebroadcast
+
+Method	NewRecord
+		- added
+		
+Method	OOFILE_handlesMessages
+		- add cases for cmd_Save, cm_Revert and cmd_dbNew
+		- renamed as msgForOOFILE
+		
+
+CLASS	dbBrowserDisplay
+- renamed as dbTableDisplay
+
+		
+Method	OOFILE_handlesMessages
+		- renamed as msgForOOFILE
+
+
+FILE	oofppx.hpp
+- also include PP_Messages.h so we pick up the standard commands
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/05/02
+COORDINATING EDITOR
+CLASS	dbEditHelper
+Method	GotoRecord
+		- added to maybe jump to a given record
+		
+Method	startEditing
+		- added to trigger loading the data
+				
+
+CLASS	dbTableHelper
+- mAddMessage & mEditMessage added
+
+Method	msgForOOFILE
+		- for Edit and double-click, just use Rebroadcast for now.
+		
+Method	setEditMessage 
+		- added, including setting browser table's double-click
+		
+		
+CLASS	dbTableDisplay
+Method	setDoubleClickedMessage
+		- added pure virtual
+		
+		
+CLASS	SbListboxDisplay
+Method	setDoubleClickedMessage
+		- added to set the listbox value
+		
+		
+CLASS	dbTableViewDisplay
+Method	SetDoubleClickedMessage
+		- added to set the listbox value
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/05/04
+REFINE COORDINATING EDITORS WHEN DELETING
+
+CLASS	dbEditHelper
+Method	DelRecord
+		- don't broadcast until AFTER deleting from the actual table. If the 
+		  listening tableHelpers have a selection of AllRecords they will pick 
+		  up the current state of the main table, before removing the record.
+		- LoadData after both new and gotoRecord
+		- don't broadcast if the record number is 0, indicating a new record
+
+CLASS	dbTableHelper
+Method	DelRecord
+		- don't broadcast until AFTER deleting from the actual table.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+MINOR BUGFIXES & CLEANUPS
+96/06/03
+
+CLASS	dbViewAsTableStorage
+Method	GetCellData 
+		- match behaviour of LTableArrayStorage::GetCellData 
+		  - return just the size of the data, if storage ptr is null
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+ADDING Y/N/Cancel BEHAVIOUR TO GUI INTERFACE
+96/06/04-05
+enum 	YNCancelT
+		- added
+		
+		
+CLASS	dbEditHelper
+		- added mClosing status variable
+		
+Method	ctor
+		- init mClosing(false)
+		- change mAutoSave(false)
+		
+Method	msgForOOFILE
+		- add case for cmd_Close which calls LeaveRecord before passing on a close
+		
+Method	LeavingAboutToSave user hook
+		- renamed as SavingBeforeCopyDataBack to be more descriptive
+		
+Method	LeavingAfterSave
+		- removed - they can use dependencies
+		
+Method	ConfirmSave
+		- return type changed from bool to YNCancelT
+		
+Method	isDirty
+		- added to iterate all links, checking if any dirty
+		
+Method	LeaveRecord
+		- call ConfirmSave if not auto saving
+
+
+CLASS	dbFieldLink
+		- mDirty added
+		
+Methods	isDirty, markDirty
+ 		- added to manipulate mDirty
+ 		
+Method	ctor
+		- init mDirty false
+		
+Method	createDirtySensor
+		- added to create a dbLinkDirtier attachment on the PowerPlant pane
+		
+		
+CLASSES	dbFieldLink subclasses
+Method	ctor
+		- for all ctor's, call createDirtySensor
+		
+Method	CopyLinkToField
+		- for all these methods, only copy if the field is dirty, and call 	
+		   createDirtySensor to sense if dirtied again.
+		
+		   
+CLASS	dbLinkDirtier 
+		- created LAttachment subclass to tell a dbFieldLink that it's dirty.
+		
+Method	ExecuteSelf
+		- catch keystroke and clipboard messages and dirty the associated dbFieldLink
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+DEBUGGING UPDATING BROWSERS FROM EDIT SAVES
+96/06/06-09
+CLASS	dbBrowseHelper
+Method	receiveMsg 
+		- don't call LoadBrowseData to resize the table, after a delete or add rec,
+		  as it ends up using LTableView::SetStorage which does an InsertRows without
+		  deleting existing rows! Instead. call the LTableView::InsertRows or 	
+		  DeleteRows which will also update the geometry and any other objects
+
+
+CLASS	dbTableDisplay
+Methods	appendRow, deleteRow
+		- added pure virtual
+		
+		
+CLASS	dbTableViewDisplay
+Methods	appendRow, deleteRow
+		- added simple calls to LTableView's methods, requesting refresh
+		
+		
+				  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+SUPPORT FOR Contacts2 LINKING TO ASSOCIATED TABLE
+96/06/09
+
+CLASS	dbBrowseHelper
+Method	gotoSelectedRecord
+		- added to synch the visible selection with the database
+		
+Method	msgForOOFILE
+		- use gotoSelectedRecord for doubleCLick & dbEdit
+				
+
+CLASS	dbTableViewDisplay
+Method	refresh 
+		- compare the rows in the view and the table and correct the table
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+ENHANCE THE PP REPORTS HACK FOR PRINTING dbRepChar from POWERPLANT
+96/06/18
+CLASS	CPPReport
+Method	PrintCharReport(Lcommander*, dbRepChar&)
+		- added to wrap the rough reports even more so to simplify user calls
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+FIX LOADING RELATED DATA INTO LISTS - WANT LAZY LOADING FOR FAST DIALOGS
+96/06/20
+CLASS	dbTableViewDisplay
+- made subclass of dbSingleListener
+Method	changeViewTo
+		- change subscription
+		
+Method	receiveMsg
+		- added to respond to OOFmsg_ChangeSelection only
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LINK DATABASE FIELDS TO STATIC TEXT DISPLAY FIELDS
+96/06/24
+CLASS	dbCharLink2Caption
+- added as copy of dbCharLink2EditText but linking to LCaption*
+
+
+CLASS	dbDateLink2Caption
+- added as copy of dbDateLink2EditText but linking to LCaption*
+
+
+CLASS	dbEditHelper
+Method	linkField(dbChar& fld, LCaption* ctl)
+Method	linkField(dbChar* fld, LCaption* ctl)
+Method	linkField(dbDate& fld, LCaption* ctl)
+Method	linkField(dbDate* fld, LCaption* ctl)
+		- added like other linkFields
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+TEMP HACK FOR KIDMAP LINKING - UPDATE RELATED BROWSERS
+96/06/24
+dbEditHelper - descend from dbBroadcaster
+- broadcast a change selection when it does LoadData
+
+dbTableViewDisplay
+- refreshes on Change Selection
+- don't subscribe to the dbTable
+  (see ctor & changeViewTo)
+  
+  
+  dbBrowseHelper::receiveMsg
+  - add OOF_ChangeSelection message
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+NEW GUI MODEL 
+96/08/02-04
+
+
+CLASS	dbHelper
+- make descendent of dbSingleListener, not dbReceiver
+- mRebroadcaster removed
+
+Method	ctor
+		- listen to table's GUI, not table
+		
+Method	Rebroadcast
+		- removed
+		
+
+CLASS	dbRebroadcaster removed
+
+
+CLASS	dbGUI
+- added PP implementation - will link different implementation for each framework so no need (for now) to use abstract hierarchy
+
+
+CLASS	dbGUIFactoryPP
+- added concrete factory to make dbGUI's (just in case we DO use abstracts later)		
+		
+		
+Change receiveMsg to returning a bool, and return true in classes:
+- dbBrowseHelper
+- dbEditHelper
+- dbTableViewDisplay
+
+		
+		
+		
+CLASS	dbEditHelper
+- mNew removed
+
+Method	SaveRecord
+		- remove Rebroadcasts
+		
+Method	receiveMsg
+		- handle OOFmsg_AttemptLeaveRecord
+				
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+NEW GUI MODEL - DEBUGGING AFTER MAKE VIEWS CLONE SHARED SELECTIONS
+96/08/09
+CLASS	dbEditHelper
+Method	receiveMsg
+		- respond to OOF_ChangeSelection by loading data
+		
+Method	SaveRecord
+		- don't actually issue a dbTable::saveRecord, that's handled by the dbGUI
+		
+
+CLASS	dbTableViewDisplay
+Method	refresh
+		- don't send true flag to InsertRows and DeleteRows as that just refreshes the 
+		  new/deleted cells. Likely that we affected sort order, so always refresh the 
+		  entire table.
+		  
+		  
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+NEW GUI MODEL - FIXING CLICK OR DOUBLE-CLICK LIST TO GOTO A RECORD
+96/08/11
+CLASS	dbGUI
+- mLastDisplayTable added
+- mLastBrowser added
+
+Method	ctor
+		- init the mLast... (0)
+		
+Method	GetDisplayTableHandler
+		- added to check the above caches, then broadcast to get an answer
+		
+Method	msgForOOFILE
+		- case cmd_dbEdit
+			- use GetDisplayTableHandler to get the correct dbBrowseHelper
+		
+Method	gotoRecord
+		- renamed as goSelectedRecord
+		- take dbBrowserHelper* param, not recno
+		- get the recno from the dbBrowseHelper
+		
+		
+CLASS	dbEditHelper
+Method	receiveMsg
+		- return false for unknown messages
+				
+		
+CLASS	dbBrowseHelper
+Method	receiveMsg
+		- return false for unknown messages
+		- handle OOFmsg_GetDisplayTableHandler via mBrowserDisplay
+		- handle OOFmsg_AttemptLeaveRecord just returning true
+		
+Method	currentSelection
+		- added to forward to view's table
+		
+Method	highlightedSelection
+		- added to build a selection from the row(s) highlighted
+		  without affecting the dbView
+		
+Method	selectRecNo
+		- added to forward to display
+		
+Method	getSelectedRecNo
+		- added to forward to display
+		
+Method	appendSelection
+		- added to forward to view's table
+		
+
+CLASS	dbTableDisplay
+Method	selectRow
+		- added pure virtual
+		
+Method	displayUsesControl
+		- added pure virtual
+		
+		
+CLASS	dbTableViewDisplay
+Method	selectRow						
+		- added to forward SetValue
+		
+Method	displayUsesControl
+		- added to test mDisplay against the pointer param
+		
+
+CLASS	dbGUI
+Method	gotoFirstOrNewRec
+		- renamed to gotoCurrentOrNewRec
+		- do nothing if a rec already loaded in database
+		  (lets us set a current record prior entering window)
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+NEW GUI MODEL - MINOR DEBUGGING FOR USER-WRITTEN SEARCHES
+96/08/16-17
+
+
+CLASS	dbGUI
+Method	changedSelection
+		- added so end users can force refreshes etc.
+		
+Method	all goXXX, newRecord, cloneRecord
+		- use changedSelection() instead of explicit broadcast
+		
+		
+CLASS	dbTableViewDisplay
+Method	refresh
+		- inset the starting point when deleting rows off end.
+		
+
+CLASS	dbEditHelper
+Method	LoadData
+		- call ensureRecordLoaded, to make sure if a search has unloaded us that we 
+		  get the buffers from disk, not just reuse the (invalid) in-memory buffers
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/08/28
+ALLOW BROWSERS TO ADD RECORDS
+
+CLASS	dbBrowseHelper
+Method	appendSelection
+		- change the param to a const selection, and pass through to table
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/08/30
+CLEANUP & IMPLEMENT SINGLE-CLICKING ON LISTS
+CLASS	dbBrowseHelper
+- mAddMessage, mEditMessage removed
+
+Method	SetEditMessage
+		- removed
+		
+		
+CLASS	dbTableViewDisplay
+Method	ctor
+		- don't set the display's double-clicked message (assume user loads from PPob)
+
+Method	refresh
+		- if selected row != current rec, change it to match
+		
+
+CLASS	dbListBoxDisplay
+Method	ctor
+		- don't set the display's double-clicked message (assume user loads from PPob)
+
+
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/08/30
+DELETING RECORDS WITH GUI
+
+CLASS	dbGUI
+Method	msgForOOFILE
+		- handle cmd_dbDel
+		
+Method	deleteRecord
+		- added like newRecord but don't check if can leave record first!
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/09/14
+COPE WITH MULTIPLE SELECTIONS IN BROWSERS
+
+CLASS	dbBrowseHelper
+Method	highlightedSelection
+		- put hack in to cope with nothing selected (was trying recno -1)
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/09/24
+COPE WITH MULTIPLE SELECTIONS IN BROWSERS
+CLASS	dbBrowseHelper
+Method	gotoSelectedRecord
+		- added assertion to check that just one record selected
+		
+		
+Method	highlightedSelection
+		- loop through selected records
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/09/25
+INTERFACE FINE-TUNING - ensure list displays match current record
+
+CLASS	dbBrowseHelper
+Method	browseViewWithListBox
+Method	browseViewWithTable
+		- select the current record number in the visible list, after loading
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/10/16
+FIX BUG IN CHANGING VIEWS
+CLASS	dbTableViewDisplay
+Method	changeViewTo
+		- delete the old storage and zero the pointer to force recreation
+		- always load, don't check mLoaded
+		
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/10/24
+FIX BUG IF PASS NIL POINTER TO dbBrowseHelper CTOR
+
+CLASS	dbHelper
+Method	ctor
+		- allow for tbl param to be nil and don't call getGUI()
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/01
+WORK WITHOUT POWERPLANT PRECOMPILED HEADERS
+
+FILE	oofpp.cpp
+#include <PP_KeyCodes.h>
+#include <LPane.h>
+#include <LDragAndDrop.h>
+#include <LStdControl.h>
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/05
+FIX BUG CAUSING EXPANSION OF OUTLINE TABLE TO CRASH - FAILING TO RELATE MN LINK
+
+
+CLASS	dbHierBrowseHelper
+Method	insertItemsBelow
+		- check if addingTable is nil, indicating bottom of hierarchy
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/11/06
+FIX BUG IF TRY TO GET SELECTION FROM TABLE WITH NONE
+
+CLASS	dbBrowseHelper
+Method	browseViewWithListBox, browseViewWithTable
+		- only select something if dbView has records
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/03
+ENHANCE HIERARCHICAL BROWSING TO ACCESS SELECTED ITEMS
+
+
+CLASS	dbViewOutlineItem
+Method	selectItemRecord()
+		- add to restrict selection to the item's record
+
+		
+CLASS	dbHierBrowseHelper
+Method	selectedItem				
+		- added to return the first/only LOutlineItem selected in the outline table
+		
+Method	selectItemRecord
+		- added to reduce the dbView of that level to just the above item, using 
+		  dbViewOutlineItem::selectItemRecord
+		  
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/03
+FIX BUGS WITH HIERARCHICAL TABLES KILLING SELECTIONS, AND GAIN SPEED
+
+CLASS	dbViewOutlineItem
+- mCachedContents added
+Method	ctor
+		- init mCacheIndex from mHelper
+				
+Method	GetDrawContentsSelf
+		- cache values for all fields, and use cached value to return
+		
+		
+CLASS	dbHierBrowseHelper
+- mNextCacheIndex, mContentsCache added
+Method	ctor
+		- init mNextCacheIndex(0)
+		
+Method	deleteContentsCache
+		- added	to delete all the strings in the cache
+		
+Method	setCachedContents
+		- added to adopt a string into the cache
+		
+Method	getCachedContents
+		- added to get a string back from the cache		
+
+Method	initCacheRow
+		- added fast way to create the storage for the row
+		
+Method	refreshBrowser
+		- added to deleteContentsCache then cause display to refresh
+		
+		
+Method	insertItemsBelow				
+		- save & restore selection on top table
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/03
+FIX BUGS IN EDITING
+CLASS	dbGUI
+Method	msgForOOFILE
+		- add missing break after cmd_Close
+		
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/03
+MORE FLEXIBILITY FOR USER CODE - ALLOW EXPLICIT COPYING OF DATA BETWEEN
+ONSCREEN EDITORS AND RECORD
+
+CLASS	dbEditHelper
+Method	CopyLinksToFields
+		- made public & rename copyLinksToFields
+		
+Method	CopyFieldsToLinks
+		- made public & rename copyFieldsToLinks
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/03
+BUGFIX - HIERARCHICAL TABLES NOT ALLOWING SINGLE-CLICK COMMAND
+CLASS	CDragDropOutlineTable
+- fix structure SDragDropOutlineTableInfo, removing text trait and buffer size fields, as we don't have a buffer size and LOutlineTable specifies the text trait.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/04
+BUGFIX - UNLESS EXPLICITLY SAVE, GET ERROR ChangeContext without save
+CLASS	dbGUI
+Method	leaveRecord
+		- save and broadcast OOF_SaveRecord, if allowed to leave.
+		
+
+CLASS	dbEditHelper
+Method	SaveRecord
+		- renamed as PrepareToSaveRecord to avoid confusion.
+		
+				
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/05
+BUGFIX - MULTI-LEVEL HIERARCHIES NOT EXPANDED
+CLASS	dbHierRelatedLevel
+Method	selectNestedItemsFor
+		- add a start() after selectJustOID() as that doesn't do a table-level start 
+		  and so not broadcasting
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/06
+GIVE USER CONTROL OVER LINKS
+
+CLASS	dbEditHelper
+Method	adoptLink(dbFieldLink*)
+		- added so user can create link and retain pointer to it, for explicit 
+		  copying between link and field.		  
+
+Move all dbFieldLink descendants from oofppx.hpp to the visible oofpp.hpp
+
+		  
+CLASS	dbTextLink2TextEdit
+Method	setField
+		- added to let user code change the linked field
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/09
+FIX PROBLEMS WITH GUI - TOO HARD FOR USER CODE TO ESTABLISH ALL NEW RECS
+(problem expecting user code to anticipate creating all related records in advance, if we have dynamic field linking, so must allow field links to auto-create and/or load related records)
+
+CLASS	dbFieldLink descendants
+Method	copyFieldToLink
+		- call ensureRecordLoaded with true param so related records will be 
+		  created, to ensure that we have a record when it's read.
+**** CANCELLED******
+Too much overhead - see design notes on doing once per relevant file.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/09
+(finish) GIVE USER CONTROL OVER LINKS
+
+
+CLASS	dbEditHelper
+Method	linkField
+		- added versions for dbUshort and dbUlong to text editor
+		
+
+Method	setField
+added to
+- dbBoolLink2Checkbox
+- dbCharLink2Caption
+- dbCharLink2TextEdit
+- dbTextLink2TextEdit
+- dbTextLink2Caption
+- dbLongLink2EditField
+- dbUlongLink2EditField
+- dbShortLink2EditField
+- dbUshortLink2EditField
+- dbDateLink2EditField
+- dbDateLink2Caption
+
+
+CLASS	dbBoolLink2Checkbox (and all others)
+- refactor all these classes so the setField method and mField are in a
+  base class (dbBoolLink) which is not PowerPlant-specific.
+  
+  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/09
+FIX BUG IN HIERARCHIC TABLES, GETTING SAME SET OF OUTCOMES FOR EACH STRAND
+CLASS	dbHierRelatedLevel  
+		- add assertion to ensure user can't specify wrong traversal field for view
+		
+		
+										
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/12
+ADD EXTRA CAPTION LINKS
+
+Add simple subclasses:
+- dbLongLink2Caption
+- dbUlongLink2Caption
+- dbShortLink2Caption
+- dbUshortLink2Caption
+- dbBoolLink2Caption
+
+
+CLASS	dbEditHelper
+Method	linkField
+		- add variations for field& and field* for the above new links
+
+
+CLASS	dbDateLink2Caption
+Method	ctor
+		- remove createDirtySensor call - it's a readonly field!!!
+
+Method	copyLinkToField
+		- remove body - readonly field never copies back!!!		
+		
+
+		
+CLASS	dbCharLink2Caption
+Method	copyLinkToField
+		- remove body - readonly field never copies back!!!		
+	
+		
+CLASS	dbTextLink2Caption
+Method	copyLinkToField
+		- remove body - readonly field never copies back!!!		
+		
+		
+		
+
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/13
+DANGEROUS HACK FOR NOW - IMPROVES STABILITY AND REDUCES FLASHING
+CLASS	dbGUI
+Method	leaveRecord
+		- only call save if mTable->isDirty() (fails to allow for just a related 
+		  table being dirty)
+
+
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/13
+DOUBLE-CLICKING TO EXPAND HIERARCHY
+
+CLASS	CDragDropOutlineTable
+Method	ClickCell
+		- check if the item clicked is expandable and toggle it's expansion state,
+		  otherwise behave same as double-clicking an LTextTableView (in our case, 
+		  drill down to an Info window)
+		  
+	
+		
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/27
+FIX FAILURE TO MARK DIRTY
+(Problem was use of single dbLinkDirtier class which only responded to typing and cut/paste type messages and thus when attached to checkboxes, radios and popups failed to notice a change)
+
+CLASS	dbLinkDirtier
+- renamed as dbEditLinkDirtier
+
+
+CLASS	dbClickLinkDirtier
+- added to respond to msg_Clicked
+
+
+CLASS	dbFieldLink
+- mDirty renamed as mMaybeDirty
+- mConfirmedDirty added
+
+Method	isDirty
+		- check mConfirmedDirty and also virtual function linkEqualsField
+		
+Method	createDirtySensor(LPane*
+		- changed as default to create a dbClickLinkDirtier
+		
+Method	createDirtySensor(LEditField*
+		createDirtySensor(LTextEdit*
+		- added to create a dbEditLinkDirtier
+		
+Method	maybeDirty
+		- added		
+
+Method	linkEqualsField		
+		- added to return default of true, for read-only controls such as LCaption
+		
+				
+CLASS	all concrete subclasses of dbFieldLink except those to LCaption		
+Method	linkEqualsField		
+		- added to compare value in control with field
+		
+		
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/27
+IMPLEMENT READ-ONLY FIELDS
+
+CLASS	dbFieldLink
+- mReadOnly added
+
+Method	isReadOnly
+		- add getter
+		
+Method	readOnly
+		- add setter
+		
+Method	ctor
+		- init mReadOnly from parameter
+		
+Method	copy ctor
+		- copy mReadOnly						
+		
+		
+CLASS	dbEditLinkDirtier
+- moved mLinkTo out to mixin parent dbLinkDirtier
+
+Method	ExecuteSelf
+		- check IsReadOnly() and change mExecuteHost to cancel message
+		- don't delete this after dirtying link
+		
+		
+CLASS	dbClickLinkDirtier
+- moved mLinkTo out to mixin parent dbLinkDirtier
+
+Method	ExecuteSelf
+		- check IsReadOnly() and change mExecuteHost to cancel message
+
+
+CLASS	dbLinkDirtier
+Method	IsReadOnly		
+		- added inline to hide call to link to check if readonly, so we can later 
+		  cache setting if wanted
+		  
+		  
+CLASS	dbEditHelper
+- mReadOnly added
+
+Method	isReadOnly
+		- add getter
+		
+Method	readOnly
+		- add setter
+		
+Method	ctor
+		- init mReadOnly(false)
+		
+Method	linkField(fld, ctl)
+		- pass mReadOnly in to ctor's in all versions
+		
+				  
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/28
+GETTING LINKS BACK FROM HELPERS
+
+CLASS	dbEditHelper
+Method	getLink
+		- added to iterate all links getting first match for LPane* param
+		
+		
+CLASS	dbFieldLink
+- mLinkTo added
+
+Method	paneMatches
+		- added
+		
+
+CLASS	dbFieldLink concrete leaves
+- remove mLinkTo
+Method	ctor
+		- pass ctl up to parent class
+		
+Method	copyLinkToField
+		- don't recreate dirty sensors
+
+
+CLASS	dbEditLinkDirtier
+Method	ExecuteSelf
+		- don't delete this when mark as dirty
+
+
+CLASS	dbClickDirtier
+Method	ExecuteSelf
+		- don't delete this when mark as dirty		
+		
+		
+		
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/04
+ADD DEBUGGING AID FOR STREAMING OUT POWERPLANT MESSAGES
+CLASS	PPMessage
+- added to wrap MessageT type
+
+FUNC	operator<<(ostream&, PPMessage&)	
+- added to dump standard message names or 4 char translation
+
+
+		
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/06
+FIX BUGS IN COLUMN SIZING, AND ADD COLUMN SIZING TO BROWSER DISPLAYS
+
+CLASS	dbBrowseHelper
+Method	browseViewWithTable
+		- use view's colSizer() to set widths
+
+
+CLASS	dbHierBrowseHelper
+Method	browseViewWithTable
+		- use view's colSizer() to set widths
+		
+		
+CLASS	dbHierRelatedLevel
+- descend publicly from dbHierLevel (left out public by accident)
+
+
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/08
+MINOR ENHANCEMENTS
+
+CLASS	dbEditHelper
+Method	table
+		- added to get the table that's being edited
+
+
+
+
+
+
+=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/08
+FIX BUG IN COMPARING FIELD CONTENTS
+
+CLASS	dbCharLink2TextEdit
+CLASS	dbTextLink2TextEdit
+Method	linkEqualsField
+		- deref handle from LTextEdit (was casting handle,not pointer)
+
+
+-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/09
+FIX BUG IN RE-EDITING BLOB FIELDS - NULL AT END OF ORIGINAL TEXT
+
+CLASS	dbCharLink2TextEdit
+CLASS	dbTextLink2TextEdit
+Method	copyFieldToLink
+		- use strlen instead of fieldDataLen as it's faster
+
+
+		  
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/09
+ADDING FROZEN HEADER ROWS TO DATABASE BROWSER
+
+CLASS	dbBrowseHelper
+- mHeadingRows added
+
+Method	ctor
+		- check dbView::willSuppressHeadings and default to one row 
+
+Method	browseViewWithTable
+		- pass mHeadingRows into the dbTableViewDisplay we create	
+		- call SetNumFrozenRows on the LTextTableView we're passed	
+
+Method	getSelectedRecNo	
+Method	highlightedSelection
+Method	gotoSelectedRecord
+		- subtract mHeadingRows from record number from row num
+			
+Method	selectRecNo			
+		- add mHeadingRows to desired record number to get row num
+		
+		
+CLASS	dbTableDisplay
+- mHeadingRows added
+
+Method	ctor
+		- init mHeadingRows from param (default 0)
+		
+		
+CLASS	dbTableViewDisplay
+Method	ctor
+		- add param for headingRows to pass up to dbTableDisplay
+		
+
+
+CLASS	dbViewAsTableStorage								
+- mHeadingRows added
+
+Method	ctor
+		- init mHeadingRows from param (default 0)
+
+Method	GetCellData
+		- subtract mHeadingRows from record number from row num
+
+
+Method	GetStorageSize
+		- add mHeadingRows to the count of rows returned
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/12
+FIX BUG WHERE CALLING highlightedSelection ON HIER TABLE STUFFS TABLE 
+SELECTION SHOWN ON THE HIER TABLE
+
+CLASS	dbHierBrowseHelper
+Method	IncludeAllBelowItem
+		- add a stSaveSelection on the table who's view is displayed at the top level
+		  below which we're getting related records.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/18
+IMPROVE HANDLING OF RELATED RECORDS IN BROWSERS
+
+CLASS	dbBrowseHelper
+Method	removeSelection(const dbSelection&)
+		- added to allow a different operation by dragging a selection from another source to remove
+		 from our current list
+		 
+Method	clearSelection
+		- added to clear the entire selection
+		
+Method	clearHighlightedSelection
+		- added to clear the selection visibly highlighted.
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/18
+MAKE USER OVERRIDING OF BEHAVIOUR EASIER
+
+// USER-HOOKS override the following virtual methods as documented in guihooks.txt
+	virtual void EnteringAboutToLoad() {};
+	virtual void EnteringAfterLoad() {};
+	virtual bool CanLeaveRecord() { return true; };
+	virtual YNCancelT ConfirmSave();
+	virtual void SavingBeforeCopyDataBack() {};
+
+
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/23
+CLARIFY INTERFACES
+
+CLASS	dbBrowseHelper
+Method	gotoSelectedRecord
+		- renamed as gotoHighlightedRecord to match the other operators which
+		  distinguish the highlighted area from the db selection
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/24
+ENABLE RUNTIME CHANGE TO LOCKED STATUS
+
+CLASS	dbEditHelper
+Method	readOnly
+		- broadcast to all links if status changes
+
+
+CLASS	dbFieldLink
+- mDisableReadOnlyPanes added
+
+Method	ctor
+		- add param for mDisableReadOnlyPanes
+		
+		
+All direct subclasses of dbFieldLink
+- pass disableReadOnlyPanes param through		
+
+pass false disableReadOnlyPanes through to ctor in
+- dbCharLink2EditField
+- dbCharLink2TextEdit
+- dbDateLink2EditField
+- dbLongLink2EditField
+- dbShortLink2EditField
+- dbUlongLink2EditField
+- dbUshortLink2EditField
+- dbTextLink2TextEdit		
+
+
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/24
+IMPROVE ENTRY CHECKING
+
+CLASS	dbCharLink2EditField
+Method	ctor
+		- set the MaxChars on the field according to the field len
+
+
+Add 	ctl->SetKeyFilter(UKeyFilters::IntegerField); in ctor's
+- dbUshortLink2EditField
+- dbShortLink2EditField
+- dbLongLink2EditField
+- dbUlongLink2EditField
+
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/26
+RENAMES TO ACHIEVE API CONSISTENCY
+
+CLASS	dbBrowseHelper
+Method	getSelectedRecNo
+		- renamed to highlightedRecNo
+		
+Method	selectRecNo
+		- renamed to highlightRecNo		
+		
+		
+CLASS	dbGUI
+Method	goSelectedRecord
+		- renamed to goHighlightedRecord
+		
+		
+CLASS	dbHierBrowseHelper
+Method	selectedItem
+		- renamed to highlightedItem		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/28
+IMPROVING RESPONSES TO STATE CHANGES IN GUI'S - NEXT RECORD BUTTON
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/28
+ADDING DEFAULT CALCULATORS, UPDATE FIELDS AND DETECT CHANGE OF FIELD
+
+CLASS	dbEditHelper
+- mCurrentField added
+
+Method	ctor
+		- init mCurrentField(0)
+		
+Method	maybeChangeField
+		- added to compare mCurrentField, public so can be called from links	
+
+Method	addLink (all variants)
+		- call setOwner
+		
+Method	adoptLink
+		- call setOwner
+		
+Method	updateDerivedFieldDisplays
+		- added to loop all links		
+		
+
+CLASS	dbFieldLink
+- mOwner added
+
+Method	ctor
+		- init mOwner(0)
+		
+Method	copy ctor
+		- just copy rhs owner (assume would probably be reset if actually new dialog)
+		
+Method	setOwner
+		- added
+		
+Method	maybeChangeField
+		- added to tell owner we're the current field (possibly weren't before)
+		
+Method	updateDerivedFieldDisplay
+		- added	to call default calculator on non-dirty fields
+		
+
+CLASS	dbHelper
+Method	maybeChangeField
+		- added blank in case we need it more generically
+		
+
+CLASS	db*Link (all field types)
+Method	updateDerivedFieldDisplay
+		- added with similar body for all other than date classes which have format masks
+		
+CLASS	dbClickLinkDirtier
+Method	ExecuteSelf
+		- call mLinkToDirty->maybeChangeField();
+		
+	
+CLASS	dbEditLinkDirtier
+Method	ExecuteSelf
+		- call mLinkToDirty->maybeChangeField(); if get tabselect or click msg
+						
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/01
+BROADCAST MESSAGES FOR CHANGE OF STATE
+
+FILE	oofmsg.hpp
+- added const OOFmsgT OOFmsg_None
+
+CLASS	dbEditHelper
+- 	added OOFmsgT members mMsgEnteringAboutToLoad, mMsgEnteringAfterLoad, mMsgCanLeaveRecord, 
+    mMsgConfirmSave, mMsgSavingBeforeCopyDataBack & mMsgChangedCurrentField
+
+Method	ctor
+		- init all new message members(OOFmsg_None)
+		
+Added message accessors
+	void msgEnteringAboutToLoad(OOFmsgT);
+	OOFmsgT msgEnteringAboutToLoad();
+	
+	void msgEnteringAfterLoad(OOFmsgT);
+	OOFmsgT msgEnteringAfterLoad();
+
+	void msgCanLeaveRecord(OOFmsgT);
+	OOFmsgT msgCanLeaveRecord();
+
+	void msgConfirmSave(OOFmsgT);
+	OOFmsgT msgConfirmSave();
+
+	void msgSavingBeforeCopyDataBack(OOFmsgT);
+	OOFmsgT msgSavingBeforeCopyDataBack();
+	
+	void msgChangedCurrentField(OOFmsgT);
+	OOFmsgT msgChangedCurrentField();
+	
+	
+	
+
+check if message has been specified & broadcast to default commander
+- EnteringAboutToLoad
+- EnteringAfterLoad
+- CanLeaveRecord
+- ConfirmSave
+- SavingBeforeCopyDataBack
+						
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/01
+INTEGRATE dbDateTime INTO PP
+
+CLASS	dbDateTimeLink
+CLASS	dbDateTimeLink2EditField
+CLASS	dbDateTimeLink2Caption
+		- added as copies of dbDate links
+
+
+CLASS	dbEditHelper
+Method	linkField(dbDateTime, *)
+		- added copies of 4 dbDate methods
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/02
+MOVE HIGHLIGHTING ON LISTS WHEN PRESS NEXT RECORD BUTTON ETC.
+
+CLASS	dbBrowseHelper
+Method	receiveMsg
+		- for case OOFmsg_ChangeSelection, get the new main record number and change highlightedRecNo
+		
+		
+CLASS	dbTableViewDisplay
+Method	selectRow		
+		- call ScrollCellIntoFrame
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/02
+HANDLE QUITTING AND APPLICATION-SPECIFIC WINDOW CLOSE COMMANDS
+
+enum	Cmd_dbBye
+		- added as 'dBye'
+		
+CLASS	dbGUI
+Method	msgForOOFILE
+		- add case for cmd_Quit to call leaveRecord()
+		- add our own Cmd_dbBye which lets us handle application buttons that close
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/02-05
+NEW MODEL OF LEAVING FIELDS
+
+CLASS	dbEditHelper
+- mCurrentField renamed to mCurrentLink
+- mMsgSavingBeforeCopyDataBack removed as don't have explicit copying stage
+
+Method	maybeChangeField
+		- call leaveLink on current link
+
+Method	receiveMsg
+		- case OOFmsg_RevertRecord now unloads and reloads record before calling
+		  LoadData, to get old data back from disk
+		- case OOFmsg_AttemptSave calls leaveLink on current link
+		- case OOFmsg_SaveRecord added to reset links
+		
+Method	ResetDirtyLinks
+		- added 		
+
+Method	isDirty
+		- check if main table dirty, don't loop field links
+
+Method	LeaveRecord
+		- calls leaveLink on current link
+		- unloads record if answer No to YNCancel
+		
+Method	msgSavingBeforeCopyDataBack
+Method	PrepareToSaveRecord
+		- removed as we don't have an explicit copying stage any more
+		
+		
+
+CLASS	dbFieldLink
+- mMaybeDirty, mConfirmedDirty removed
+- mField added (removed from subclasses)
+
+Method	maybeDirty, markDirty
+		- removed
+
+Method	isDirty
+		- check mfield status
+		
+Method	leaveLink
+		- added
+		
+Method	copyFieldsToLinks
+		- call markClean on the links		
+		
+		
+CLASS	db*Link
+- mField removed, moved up to dbFieldLink
+
+Method	field
+		- added inline to cast parent mField	
+
+
+CLASS	db*Link2*
+Method	copyLinkToField
+		- don't check isDirty
+		
+
+CLASS	dbEditLinkDirtier
+Method	ExecuteSelf
+		- don't call maybeDirty
+		
+		
+CLASS	dbClickLinkDirtier
+Method	ExecuteSelf
+		- don't call maybeDirty
+		
+		
+SPLIT LINK CLASSES OUT INTO oofpplk.cpp
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/05
+FIX BUG WHERE EMPTY FIELD CONTENTS NOT COPIED BACK
+(strncmp returns 0 if n==0)
+
+Also test the lhs length in:
+- dbCharLink2EditField::copyLinkToField
+- dbCharLink2EditField::linkEqualsField
+- dbCharLink2TextEdit::copyLinkToField
+- dbCharLink2TextEdit::linkEqualsField
+- dbTextLink2TextEdit::copyLinkToField
+- dbTextLink2TextEdit::linkEqualsField
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/06-07
+VALIDATE ON DEPARTURE FROM RECORDS, INCLUDING EXPLICIT SAVE
+
+CLASS	dbEditHelper
+- mMsgCanLeaveRecord renamed to mMsgCanSaveRecord
+
+Method	msgCanLeaveRecord
+		- renamed to msgCanSaveRecord
+		
+Method	CanLeaveRecord
+		- renamed to CanSaveRecord
+		- call ValidateLinks 
+		
+Method	ValidateLinks
+		- added, with check for duplicates only
+				
+				
+CLASS	dbFieldLink
+Method	field
+		- added				
+		
+Method	highlightLink
+		- added to select thefield or whatever by sending it the command msg_TabSelect
+				
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/07
+IMPROVE HANDLING OF UNIQUE AND DEFAULT CALCULATED FIELDS
+
+CLASS	dbFieldLink
+Method	leaveLink
+		- check if field is empty and refuse to allow user to delete the content
+		
+Method	linkIsEmpty
+		- added to test if empty string in pane		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/08
+FIX AMAZING SLOWNESS CHANGING PANELS
+(problem with Hiding current panel if an edit field is a commander - LTabGroup::RotateTarget iterates over every possible commander finding one not enabled. This is a factorial number of calls to maybeChangeField!)
+
+CLASS	dbEditLinkDirtier
+Method	ExecuteSelf
+		- check if pane enabled before calling maybeChangeField
+		
+
+CLASS	dbClickLinkDirtier		
+Method	ExecuteSelf
+		- check if pane enabled before calling maybeChangeField
+		
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/18
+FIX BUG IN CLEARING SELECTIONS
+
+CLASS	dbBrowseHelper
+Method	highlightedSelection
+		- check highlightedRow against num recs in table
+		  as sometimes having no record selected returns high number
+		  
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/20
+CASUAL DEBUGGING, LEAK FIXES
+
+CLASS	dbGUI
+Method	msgForOOFILE
+		- add checks for DefaultCommander being nil
+		
+		
+CLASS	dbGUI
+Method	GetDisplayTableHandler
+		- disabled mLastDisplayTable logic as sometimes on 68K build get 
+		  identical table pointer address, but different browser object.
+		  
+
+CLASS	dbEditHelper
+Method	SendFrameworkMessage		  
+		- add checks for DefaultCommander being nil
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/23
+CASUAL DEBUGGING
+CLASS	dbEditHelper
+Method	LeaveRecord
+		- clear mCurrentLink because wasn't triggered by the pane's resetting 
+		  us back to first field, so if left screen whilst in 2nd field didn't
+		  register leaving first (showed as KIDMAP Student ID not being
+		   calculated)
+
+Method	maybeChangeField		   
+		- check the current target if no current link, so copes with first 
+	      field in screen
+
+use GetTarget instead of GetDefaultCommander in:		   
+- dbEditHelper::SendFrameworkMessage		   
+- CLayerGroup::SetValue
+- oofYNC::msgBox
+- dbGUI::msgForOOFILE
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/25
+CASUAL DEBUGGING
+
+CLASS	dbGUI
+Method	msgForOOFILE
+		- add #ifdef OOF_DEBUG_LOG_NAME to dump message
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/29
+CLEANUP MINOR BUGS
+
+CLASS	dbFieldLink
+Method	maybeDirty		
+		- call dbHelper::maybeDirty
+
+
+CLASS	dbHelper
+Method	maybeDirty
+		- add pure virtual		
+
+
+CLASS	dbEditHelper
+Method	DelRecord
+		- remove unused method (handled by dbGUI)
+		
+Method	maybeDirty
+		- add to set mCurrentLink (eg: if we never move off the first field in
+		 the form, we need to know that field so it can be saved and
+		 validated)
+		
+		
+CLASS	dbBrowseHelper
+Method	DelRecord
+		- remove unused method (handled by dbGUI)
+
+Method	maybeDirty
+		- add empty stub
+		
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/06
+TEMPORARY FIX FOR SHARED SELECTIONS - DON'T ADD NEW RECORD OIDS TO SELECTION
+
+CLASS	dbBrowseHelper
+Method	receiveMsg
+		- for OOFmsg_NewRecord, tell display to highlightNothing
+		
+
+CLASS	dbGUI
+Method	newRecord
+		- instead of calling changedSelection, broadcast OOFmsg_NewRecord	
+		
+
+CLASS	dbEditHelper
+Method	receiveMsg
+		- add case for OOFmsg_NewRecord to call LoadData, same as
+		  OOFmsg_ChangedSelection		
+		  
+		  
+CLASS	dbTableDisplay & subclasses
+Method	selectedRow
+		- rename as highlightedRow for consistency		  
+
+Method	selectRow
+		- rename as highlightRow for consistency		  
+
+Method	nextSelectedRow
+		- rename as nextHighlightedRow for consistency		  
+
+Method	highlightNothing
+		- added pure virtual		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+VERSION 1.3b3 released  6th April 1997
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/10-11
+MINOR FIXES
+
+CLASS	dbEditHelper
+Method	msgEnteringAfterLoad(both cases)
+		- change member variable set/get from (original cut-and-pasted)
+		  mMsgEnteringAboutToLoad to mMsgEnteringAfterLoad
+
+
+Method	maybeDirty
+		- remove assertion that inLink==mCurrentLink as it is wrongly
+		 triggered(?) when mCurrentLink points to a caption, and user starts
+		 typing. I think there's an assumption here that's violated depending
+		 on the order of fields being linked - if a caption is the last field
+		 linked we have a mismatch between the current link and the current
+		 entry field as PowerPlant sees it.
+		 
+		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/11
+GUI ENABLE FIND BY TYPING IN BROWSERS
+
+CLASS	dbViewAsTableStorage
+Method	FindCellData
+		- fill in to search by a single field
+
+
+		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/18
+BRAD'S FIX TO NIL DEFAULT COMMANDER BUG
+
+CLASS	oofYNC
+Method	msgBox
+		- save and restore current default commander around showing new window
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/20
+DEBUGGING DISPLAY OF RELATED RECORDS
+
+CLASS	dbBrowseHelper
+Method	browseViewWithTable
+		- use OOF_RelMN::makeRelMaintainer instead of creating dbRelMaintainer
+		  directly ourselves
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/25
+FIX BUG WITH LWINDOW::DOCLOSE() CRASHING IN DIRTY SENSOR
+(at window deletion, LAttachments are still there but mEditHelper deleted)
+
+
+CLASS	dbFieldLink
+- mDirtySensor added
+
+Method	createDirtySensor(all)
+		- keep track of sensor with mDirtySensor
+		
+Method	ctor, copy ctor
+		- init mDirtySensor(0)
+		
+Method	dtor
+		- delete mDirtySensor
+
+
+CLASS	dbLinkDirtier (and all subclasses)
+Method	dtor
+		- added empty virtual, so can delete a dbLinkDirtier*						
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/25
+IMPROVE SCROLLING LIST BEHAVIOUR - FIND BY TYPING
+
+CLASS	dbViewAsTableStorage
+Method	FindCellData
+		- change search from startsWith to greaterThanOrEqual so if given
+		letter not in list, will scroll to next. That reflects user
+		expectation - they see the area the letter would be in.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/30
+ADD FIELD-LEVEL VALIDATION (JUST FOR DATES, with scope for expansion)
+
+CLASS	dbEditHelper
+Method	maybeChangeField
+		- check result from leaveLink and don't leave the field if false
+		
+Method	receiveMsg
+		- check result from leaveLink to save calling CanSaveRecord		
+		
+Method	ValidateLinks
+		- call dbFieldLink::validToLeaveForm		
+		
+		
+CLASS	dbFieldLink
+Method	validtoLeaveForm
+		- added duplicate check from dbEditHelper::ValidateLinks
+
+Method	validToLeaveLink
+		- added defaults returning true		
+
+Method	highlightLink
+		- use SwitchTarget rather than ObeyCommand, to go to field
+		
+
+CLASS	dbDateLink2EditField
+Method	validToLeaveLink		
+		- added to verify date
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/06
+FIX FAILURE TO REACT TO SAVE COMMAND
+
+CLASS	dbFieldLink
+Method	leaveLink
+		- if not dirty, return true (assumes field valid in initial or current
+		  saved state)
+
+
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/06
+FIX GUI LISTS SO TYPING KEYS DOESN'T CARE ABOUT TYPE OF DB OR INDEX FIELD
+
+CLASS	dbViewAsTableStorage
+Method	FindCellData
+		- accept compound fields as well as char fields to do find
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/06
+SUPPORT CLICKING LIST TO GET RECORD NUMBER
+
+CLASS	dbViewAsTableStorage
+Method	FindCellData
+		- added
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/09-11
+LOCKING & EXCEPTIONS
+
+CLASS	dbGUI
+Method	ctor
+		- init mLockedCurrentRecord(0)
+		
+Method	gotoCurrentOrNewRec
+		- call changedSelection rather than doing broadcast ourselves
+				
+Method	leaveRecord
+		- unlockRecord
+		
+Method	changedSelection
+		- try to lock record, with warning if locked already		
+		- set mLockedCurrentRecord appropriately
+		- take optional param of receiver to skip
+
+Method	goHighlightedRecord
+		- use changedSelection to broadcast that we've moved record
+				
+Method	lockedCurrentRecord
+		- added getter		
+
+Method	msgForOOFILE
+		- for case cmd_Cancel, unlock record
+				
+		
+CLASS	dbEditHelper
+Method	receiveMsg		
+		- for OOFmsg_ChangeSelection, test senderDefined and make read-only if
+		  already locked
+
+Method	readOnly
+		- check if GUI allows us to be writable
+		- use dbFieldLink::PreApprovedReadOnly
+		  
+		  
+CLASS	dbBrowseHelper
+Method	removeSelection
+Method	clearSelection
+		- check with the GUI of our main table to see if locked & just beep
+		
+
+CLASS	dbFieldLink
+- made friend of dbEditHelper::readOnly
+
+Method	readOnly
+		- moved guts to PreApprovedReadOnly
+		- check if GUI allows us to be writable
+
+Method	PreApprovedReadOnly
+		- added
+	
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/13
+DEBUGGING LOCKING
+
+CLASS	dbGUI
+- mDontCareIfLocked added
+
+Method	ctor
+		- init mDontCareIfLocked(true)
+
+Method	leaveRecord
+		- always unlock, not just if record was dirty
+		
+Method	lockedCurrentRecord
+		- renamed as recordAvailable
+		- check mDontCareIfLocked		
+
+
+
+CLASS	dbEditHelper
+Method	linkField(someFieldType*
+		- change all to use adoptLink, instead of having same couple of lines
+		
+CLASS	dbFieldLink
+Method	setField
+		- Removed identical copy from all dbXXLink subclasses and moved here.
+
+Method	tellGUIcareAboutLocking
+		- added so concrete links to editable controls can make sure that
+		  linking an editable field makes it's GUI want to lock recors
+		
+Method	createDirtySensor(all)
+		- call tellGUIcareAboutLocking, as this is nice central point for
+		  editable fields		
+		
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/13
+BEEP IN ALERTS
+
+CLASS	oofYNC
+Method	msgBox		
+		- add SysBeep
+		
+		
+Remove SysBeep calls that precede an oofYNC
+- dbDateLink2EditField::validToLeaveLink
+- dbDateTimeLink2EditField::validToLeaveLink
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/14
+FIX BUG IN KIDMAP "OUTCOMES" SCREEN - FAILING TO COPY A FIELD
+(found sometimes mCurrentLink pointing at popup, not expected editfield)
+
+CLASS	dbEditHelper
+Method	maybeDirty
+		- *always* set mCurrentLink, not just when 0
+		
+Method	LeaveRecord
+		- only clear mCurrentLink if actually leaving, so know where we are if
+		  user fails form validation		
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/16
+FIX BUG - NEW RECORDS FAIL TO CLEAR RELATED LISTS
+(sometimes results in gotoRecord X of 0)
+
+CLASS	dbBrowseHelper
+Method	receiveMsg
+		- react to OOFmsg_NewRecord by also calling refreshBrowser.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/17
+FIX BUG - TYPE CHAR TO SCROLL LIST DOESN'T WORK FOR FIRST CHAR IN LIST
+
+CLASS	dbViewAsTableStorage
+Method	FindCellData
+		- remove if(recNo0)
+		- don't offset for mHeadingRows as the scroller logic does that
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/06/12
+FIX MINOR BUGS WITH DIFFERENT CONFIGURATIONS & INTEGRATE MERCATOR MODS
+
+CLASS	dbGUI
+Method	goHighlightedRecord
+		- don't do anything if go to current record (was trying leaveRecord
+		 first, triggering unnecessary saveRecord's etc.)
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/12
+MAKE OOFYNC MORE LIKE FUNCTION CALL - CAN USE ANY ANONYMOUS VARIANT
+
+CLASS	oofYNC
+- mDisplayed added
+
+Method	ctor (various)
+		- don't invoke msgbox
+		
+Method	msgbox
+		- set mDisplayed
+		
+Method	dtor
+		- check mDisplayed and display if not already displayed				
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/20
+COPE WITH RESETTING TABLE STORAGE (LTableView::SetTableStorage mod)
+
+CLASS	dbTableViewDisplay
+Method	loadData
+		- only call LTableView::SetTableStorage when we create our storage
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/19,23
+MAKE CDRAGDROPOUTLINE TABLE BEHAVE LIKE TEXT LISTS FOR SELECTION
+(shift extends selection, cmd is for individual, can click in white space)
+
+CLASS	dbViewOutlineItem
+Method	ClickCell 
+		- added so we can override the hit testing on cell visible text
+		- use the table's selector to decide what kind of selection we get
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/28
+BRAD'S FIX TO MSGBOX OSTRSTREAM VERSION
+
+CLASS	oofYNC
+- mMsg changed from char* to OOF_String
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/01
+ALLOW NESTING OF CURSOR CHANGES
+
+CLASS	stSetCursor
+- sSetCursorCount added
+
+Method	ctor
+		- inc sSetCursorCount
+		
+Method	dtor
+		- dec sSetCursorCount & only if 0 do we revert the cursor		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/01,07
+FIX METACHARACTERS IN MENUS
+
+CLASS	dbUshortLink2Popup
+Method	dbUshortLink2Popup
+		- use SetMenuItemText to set string in menu
+		
+		
+Method	linkEqualsField
+		- fix bug, using > count instead of >= count
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/16,17
+INTEGRATION OF NEW STREAMS
+
+change copyAsChars to copyString in
+- dbFieldLink::validToLeaveForm
+- dbListBoxDisplay::LoadRow
+- dbViewOutlineItem::GetDrawContentsSelf
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/25-26
+FIX USE OF STREAMS THROUGHOUT
+centralise the stream conversion logic in OOF_String
+
+CLASS	oofYNC
+Method	ctor(ostream&
+		- directly pass the ostream& into the mMsg member
+		
+
+
+CLASS	dbEditHelper
+Method	warnUser
+		- Use OOF_STRING for stream conversion
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/11/12
+MINOR FIXES AND CODE MERGE
+
+CLASS	dbFieldLink
+Method	validToLeaveForm
+		- change ostringstream to stringstream
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/01-02
+ALLOW RESETTING OF HIERARCHICAL BROWSER
+
+
+CLASS	dbHierBrowseHelper
+Method	dtor
+		- move contents to deleteAllLevels
+		
+Method	resetTableAfterViewRestructure
+		- added to use after deleteAllLevels then add new ones
+
+Method	browseViewWithTable
+		- move most of content to resetTableAfterViewRestructure	
+		
+
+Method	deleteContentsCache
+		- delete all bits in the cache (resets counter) and reset
+		  mNextCacheIndex
+		  
+
+CLASS	dbViewOutlineItem
+Method	GetDrawContentsSelf
+		- exit if column exceeds view's fields. It is legit for a hierarchy to
+		  have different numbers of fields in each level.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d13 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+	
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d16 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/02/08
+IMPROVE SEARCH BY TYPING IN GUI LISTS
+(KEYPRESS FIND)
+
+CLASS	dbViewAsTableStorage
+Method	FindCellData
+		- pass in bool to recordNumber(query) to see if actually found
+		
+		
+CLASS	dbViewOutlineItem
+Method	oid
+		- added simple getter returning mOID
+		
+Method	findOIDforData
+		- added to search the view used for the current level				
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/15
+NON-SORTED KEYPRESS FIND
+
+CLASS	dbViewOutlineItem
+Method	findOIDforData
+		- use theView->defaultFindField()
+
+		
+CLASS	dbViewAsTableStorage
+Method	FindCellData		
+		- use mView->defaultFindField()
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/15
+COMPILE WITHOUT PP PRECOMPILED HEADERS
+
+FILE	oofync.cpp
+- add includes for LString, LCaption & LPicture.h
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/15
+SOME UPDATING FOR APPMAKER 10 AND CODEWARRIOR PRO3 APPEARANCE CLASSES
+(VERY MUCH INTERIM APPROACH!)
+
+FILE	oofpp.h
+- add definitions of extra messages to match MFC (diff values)
+  - cmd_dbLockedOnEntry
+- add forward decl of LEditText
+
+CLASS	dbEditHelper
+Methods added
+	linkField(dbChar&, LEditText*
+	linkField(dbChar*, LEditText*
+	linkField(dbText&, LEditText*
+	linkField(dbText*, LEditText*
+	linkField(dbChar&, LTextEditView*
+	linkField(dbChar*, LTextEditView*
+	linkField(dbText&, LTextEditView*
+	linkField(dbText*, LTextEditView*
+	void linkField(dbLong&, LEditText*);
+	void linkField(dbLong*, LEditText*);
+	void linkField(dbUlong&, LEditText*);
+	void linkField(dbUlong*, LEditText*);
+	void linkField(dbShort&, LEditText*);
+	void linkField(dbShort*, LEditText*);
+	void linkField(dbUshort&, LEditText*);
+	void linkField(dbUshort*, LEditText*);
+	void linkField(dbDate&, LEditText*);
+	void linkField(dbDate*, LEditText*);
+	void linkField(dbDateTime&, LEditText*);
+	void linkField(dbDateTime*, LEditText*);
+
+
+CLASS	dbFieldLink	
+Method	createDirtySensor(LEditText*
+Method	createDirtySensor(LTextEditView*
+		- added copy of others
+
+
+CLASS	added
+	dbCharLink2EditText
+	dbCharLink2TextEditView
+	dbTextLink2EditText
+	dbTextLink2TextEditView
+	dbLongLink2EditText
+	dbUlongLink2EditText
+	dbShortLink2EditText
+	dbUshortLink2EditText
+	dbDateLink2EditText
+	dbDateTimeLink2EditText
+	
+
+CLASS	CYNCDlg
+Method	RegisterClass	
+		- register LCaption, LPicture & LStdButton
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/07
+UPDATING FOR APPMAKER 10 AND CODEWARRIOR PRO3 APPEARANCE CLASSES
+
+Fix casts that were left over from copying, cast to LTextEditView* instead of LTextEdit*
+- dbTextLink2TextEditView::copyLinkToField
+- dbTextLink2TextEditView::copyFieldToLink
+- dbTextLink2TextEditView::linkEqualsField
+- dbCharLink2TextEditView::copyFieldToLink
+- dbCharLink2TextEditView::copyLinkToField
+- dbCharLink2TextEditView::linkEqualsField
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/21
+CODEWARRIOR PRO3 EDIT CLASS AND OLD CW11 CONDITIONAL COMPILATION
+
+FILE	oofpp.h
+- if not defined, define OOF_PP18_TEXTEDIT and OOF_PP18_TEXTEDIT based on
+  __PowerPlant__ (from PP_Types.h or PP_Macros.h)
+
+FILE	oofpp.h, oofpp.cpp
+- make all LEditField & LTextEdit references conditional on  #ifdef OOF_PP17_TEXTEDIT
+- make all LEditText & LTextEditView references conditional on  #ifdef OOF_PP18_TEXTEDIT
+
+  
+FILE	oofpp.cpp
+- make inclusions conditional on #ifdef OOF_PP18_TEXTEDIT
+
+
+FILE	oofpphier.cpp
+- removed #include <LTextEdit.h>
+
+
+CLASS	dbTextLink2EditText
+- change all casts from (LTextEdit*) to (LEditText*)
+
+
+CLASS	dbTextLink2EditText
+- removed
+
+
+CLASS	dbEditHelp
+Method	linkField(dbText&, LEditText*);
+		linkField(dbText*, LEditText*);
+		- removed
+
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/02
+FIX FAILURE TO SAVE WHEN CONTENT EDITED TO MATCH ORIGINAL
+
+CLASS	dbFieldLink
+Method	leaveLink
+		- return true if mMaybeDirty but equal to field
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/24
+MINOR UPDATE FOR CW PRO4 - LINK TEXT FIELDS TO EDIT CLASS
+
+CLASS	dbEditHelper
+Method	linkField(dbChar&, LEditText*), linkField(dbChar*, LEditText*) added
+
+
+CLASS	dbTextLink2EditText
+- added copy of dbCharLink2EditText
+
+
+CLASS	dbUshortLink2Popup
+- removed from OOFILE - client-specific hack, not supported and insufficiently generic
+  for our use.
+  
+  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/01-10
+NEW Adapter PATTERN FOR CONTROL LINKING
+
+
+Added family of Adapter classes:
+- oofGUIAdapter
+- oofGUIAdaptControl
+- oofGUIAdaptLControl
+- oofGUIAdaptEditor
+- oofGUIAdaptLTextEdit
+- oofGUIAdaptLEditField
+- oofGUIAdaptLEditText
+- oofGUIAdaptLTextEditView
+- oofGUIAdaptLCaption
+
+
+CLASS	dbFieldLink
+- mDirtySensor removed
+
+Method	createDirtySensor
+		- all removed
+		
+Method	paneMatches, linksto
+		- removed
+
+REMOVED CLASSES
+- dbCharLink2EditField
+- dbCharLink2TextEdit
+- dbCharLink2TextEditView
+- dbCharLink2EditText
+- dbCharLink2Caption
+- dbTextLink2TextEdit
+- dbTextLink2TextEditView
+- dbTextLink2EditText
+- dbTextLink2Caption
+- dbBoolLink2Checkbox
+- dbBoolLink2Caption
+- dbLongLink2EditField
+- dbLongLink2EditText
+- dbLongLink2Caption
+- dbUlongLink2EditField
+- dbUlongLink2EditText
+- dbUlongLink2Caption
+- dbShortLink2EditField
+- dbShortLink2EditText
+- dbShortLink2Caption
+- dbUshortLink2EditField
+- dbUshortLink2EditText
+- dbUshortLink2Caption
+- dbDateLink2EditField
+- dbDateLink2EditText
+- dbDateLink2Caption
+- dbDateTimeLink2EditField
+- dbDateTimeLink2EditText
+- dbDateTimeLink2Caption
+
+ADDED dbFieldLink subclasses
+- dbNumericFieldLink
+- dbDateTimeLink2Editor
+- dbDateLink2Editor
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/10
+NEW GUI INTERFACING - UPDATING DERIVED FIELDS
+
+CLASS	dbFieldLink
+Method	updateLinkOnExit
+		- added	base virtual that does nothing
+		
+		
+CLASS	dbNumericField
+Method	updateLinkOnExit
+		- added to check format string and copyFieldToLink if has one
+		
+  
+  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/10
+FINISH  NEW GUI AND MOVE TO PLATFORM-INDEPENDENT SOURCE
+
+FILE	oofgui.h, oofgui.cpp
+- created to contain platform-independent classes
+
+move the following to oofgui.*
+- enum YNCancelT
+- class dbGUIAdapter
+- class dbGUIAdaptControl
+- class dbGUIAdaptEditor
+- class dbFieldLink
+- class dbGUI
+- class dbHelper
+- class dbEditHelper
+- class dbCharLink
+- class dbTextLink
+- class dbNumericFieldLink
+- class dbDateLink2Editor
+- class dbDateTimeLink2Editor
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/14
+ADD ABSTRACT BASE HELPERS (PARTLY LIKE MFC)
+
+CLASS	dbAbstractBrowseHelper
+
+CLASS	dbAbstractEditHelper
+		- added, see dbEditHelper changes
+
+CLASS	dbGUI
+Method	goHighlightedRecord
+		- change param from dbBrowseHelper to dbAbstractBrowseHelper
+		
+		
+CLASS	dbEditHelper
+- made subclass of dbAbstractEditHelper
+- moved the following methods to base class
+- adoptLink
+- receiveMsg
+- ConfirmSave
+- EnteringAboutToLoad
+- EnteringAfterLoad
+- CanSaveRecord
+- ChangedCurrentField
+- maybeDirty
+- getLink
+- LeaveRecord
+- LoadData
+- warnUser
+- readOnly
+- ValidateDirtyLinks
+- copyLinksToFields
+- ResetDirtyLinks
+- copyFieldsToLinks
+- updateDerivedFieldDisplays
+- isDirty
+- maybeChangeField
+
+Method	currentGUItarget
+		- added to provide platform-specific hook used in maybeChangeField
+
+
+CLASS	dbBrowseHelper
+- made subclass of dbAbstractBrowseHelper
+- made the following methods virtual
+  - highlightedRecNo
+  - highlightedSelection
+  - highlightRecNo
+
+Method	updateBrowserSelection
+		deleteSelection
+		highlightNothing
+		- added copy from MFC
+  
+  
+CLASS	dbLinkDirtier
+- removed  
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+ADD VERSION DEFINES TO ALL OOFILE PACKAGES
+
+FILE	oofpp.h
+- add OOFVERS_PP
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+FINISH NEW GUI - ADD OLD CLASSES AS INTERFACES TO NEW STRUCTURE
+
+FILE 	oofpp.h
+- add class defs for the following just calling dbFieldLink
+dbCharLink2EditField
+dbCharLink2TextEdit
+dbRealLink2EditField
+dbTextLink2TextEdit
+dbShortLink2EditField
+dbTextLink2Caption
+dbUshortLink (used as parent class by Mercator's dbUshortLink2Popup)
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+FINISH NEW GUI - COMPLETE BROWSER ABSTRACTION LIKE MFC
+
+CLASS	dbHierBrowseHelper
+Method	highlightNothing, highlightRecNo, updateBrowserSelection
+		- added empty override
+		
+Method	highlightedRecNo
+		- added stub to implement later 
+		  (not used yet but needed to be able to interchange with straight list)
+		  
+Method	view
+		- added to return view from topmost level
+		
+		
+CLASS	dbBrowseHelper
+Method	view
+		- made non-inline as is now virtual
+		
+Method	deleteSelection, receiveMsg
+		- moved up to abstract parent						  		
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+FINISH NEW GUI - UNIFY OOFYNC
+
+FILE 	oofync.h
+- moved to GUI folder
+- combined PPlant and MFC versions
+
+
+FILE	oofync.cpp
+- renamed to oofppyn.cpp
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/24-26
+FINISH NEW GUI - DEBUGGING LINKS
+
+CLASS	dbGUIAdaptLControl
+Method	clone
+		- added
+		
+Method	setValue, getValue, equalsValue
+		- implemented
+		
+Method	adaptsControl		
+		- added to compare void* to mControl
+		
+				
+CLASS	dbGUIAdaptEditPane
+Method	getString, setString, equalsString
+		- provide implementation using Get and SetDescriptor		
+			
+Method	adaptsControl		
+		- added to compare void* to mPane
+
+				
+CLASS	dbGUIAdaptLCaption
+Method	getString, setString, equalsString
+		- removed - use dbGUIAdaptEditPane		
+		
+		
+CLASS	dbGUIAdaptLargeEditPane
+- added to provide common logic for GetTextHandle/SetTextPtr 
+  field types, so subclasses just provide those methods		
+		
+				
+CLASS	dbGUIAdaptLCaption
+Method	getString, setString, equalsString
+		- removed - use dbGUIAdaptEditPane
+		
+
+CLASS	dbGUIAdaptLTextEdit
+- made subclass of dbGUIAdaptLargeEditPane
+
+Method	getString, setString, equalsString
+		- removed - use dbGUIAdaptLargeEditPane
+
+Method	SetTextPtr, GetTextHandle
+		- added trivial accessors to pane
+	
+
+CLASS	dbGUIAdaptLTextEditView
+- made subclass of dbGUIAdaptLargeEditPane
+
+Method	getString, setString, equalsString
+		- removed - use dbGUIAdaptLargeEditPane
+
+Method	SetTextPtr, GetTextHandle
+		- added trivial accessors to pane
+		
+
+CLASS	dbGUIAdaptLEditText
+- made subclass of dbGUIAdaptLargeEditPane
+
+Method	getString, setString, equalsString
+		- removed - use dbGUIAdaptLargeEditPane
+
+Method	SetTextPtr, GetTextHandle
+		- added trivial accessors to pane
+
+
+CLASS	dbBrowseHelper
+Method	receiveMsg
+		- added with cases for OOFmsg_DeleteRecord & OOFmsg_GetDisplayTableHandler
+		  defaulting to calling parent dbAbstractBrowseHelper
+
+
+CLASS	dbHierBrowseHelper
+Method	receiveMsg
+		- added with case for OOFmsg_GetDisplayTableHandler
+		  defaulting to calling parent dbAbstractBrowseHelper
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/02
+REWRITE OUTLINE ITEMS TO USE MIXIN & ALLOW MORE FLEXIBLE HIERARCHICAL BROWSING
+
+CLASS	dbViewOutlineItem
+- mIndentLevel, mOID, mHelper, mCacheIndex moved to OOF_mixOutlineItem
+- made subclass of OOF_mixOutlineItem
+- dbHierBrowseHelper no longer a friend
+
+Method	CanExpand
+		- don't call mHelper, use parent isLeaf
+
+Method	findOIDforData		
+		- moved to OOF_mixOutlineItem
+		- don't use mHelper->findViewForLevel(mIndentLevel), just view()
+
+Method	GetDrawContents		
+		- moved guts to OOF_mixOutlineItem::GetDrawContentsFromView
+		- don't use mHelper->findViewForLevel(mIndentLevel), just view()
+
+Method	selectItemRecord		
+		- moved to OOF_mixOutlineItem
+		- don't use mHelper->findViewForLevel(mIndentLevel), just view()
+
+		
+CLASS	dbHierBrowseHelper
+Method	insertItemsBelow
+		- change params to take (LOutlineItem*, OOF_mixOutlineItem*)
+		- use accessor methods on OOF_mixOutlineItem instead of member vars
+		- if indent level deeper than existing number of levels, call
+		  dbHierLevel::makeNestedLevel to attempt to add levels dynamically
+		- use factory method dbHierLevel::makeNestedOutlineItem instead of
+		  assuming we create dbViewOutlineItems all the time
+		
+Method	highlightedSelection
+		- call theItem->isLeaf instead of local itemIsAtBottom
+		- use accessors oid() and indentLevel() instead of member vars
+
+Method	itemIsAtBottom
+		- use accessor indentLevel() instead of member var
+		- take OOF_mixOutlineItem* param instead of dbViewOutlineItem
+		
+Method	IncludeAllBelowItem, FirstOIDbelowItem
+		- use deepestIndent instead of (mHierLevels.count()-1)		
+
+Method	deepestIndent
+		- added simple inline (mHierLevels.count()-1)
+
+Method	highlightedItem
+		- return OOF_mixOutlineItem* param instead of dbViewOutlineItem
+
+Method	highlightedOID, highlightedSelection
+		- cast to OOF_mixOutlineItem* param instead of dbViewOutlineItem
+		
+
+CLASS	OOF_mixOutlineItemFactory		
+		- made factory method creating dbViewOutlineItems
+		
+
+CLASS	dbHierLevel
+- made subclass of OOF_mixOutlineItemFactory
+- mItemFactory added
+
+Method	ctor
+		- init mItemFactory(this)
+		- take extra adoptedFactory param (default 0)
+
+Method	dtor
+		- delete mItemFactory
+		
+Method	makeNestedOutlineItem
+		- made factory method creating dbViewOutlineItems
+
+Method	makeNestedLevel
+		- added virtual default that returns 0
+		
+		
+CLASS	dbHierRelatedLevel
+Method	ctor
+		- take extra adoptedFactory param (default 0) to pass to parent ctor
+
+Method	selectNestedItemsFor
+		- put back assert but don't assume traversal field in same table object as
+		  view, just that they are same table number								
+
+								
+CLASS	dbHierRecursiveRelatedLevel
+- added with override of makeNestedLevel								
+
+
+CLASS	dbView
+Method	ctor(const dbView&, const dbTable*)
+		- added copy ctor that allows us to override table, but it must be clone of
+		  original view's table
+		  
+Method	FinishCopy
+		- moved guts of old copy ctor here
+		
+Method	copy ctor
+		- use FinishCopy
+		
+						  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/03
+COMPILE LIBRARIES, PRECOMPILED HEADERS
+
+FILE	oofgui.h
+- add #include <PP_Types.h>
+
+FILE	oofpp.h
+- add #include <LControl.h>						  
+
+						  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/04
+CHANGES FROM REFINING PP EXAMPLES
+
+CLASS	dbGUI
+Method	isOOFILEcommandEnabled
+		- make return value indicate if handled command
+		- pass outEnabled as Boolean& to acutally enable or disable
+		
+		
+
+						  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/04
+PROVIDE DEFAULT HIERARCHICAL ITEMS FOR RECURSIVE TREES
+
+CLASS	dbOutlineItemFactory		
+- added to make trivial difference to default factory - uses a field
+  in the view's table to decide if is leaf or not, and is easily subclassed
+  to make your own types, using our logic based on field lookups to decide if 
+  leaf classes
+
+
+CLASS	dbHierLevel
+Method	ctor(dbView*, const dbBool&)
+		- added to allow leaf field to be specified, creating a dbViewOutlineItemFactory
+		
+
+CLASS	dbHierRelatedLevel
+Method	ctor(dbView*, dbRelRefBase&, const dbBool&)
+		- added to call new base ctor
+
+						  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/11
+FIX CONST ERROR WHEN COMPILING
+(Pro 4.1 bug allowed them through)
+
+
+CLASS	dbGUIAdaptLargeEditPane (and all subclasses)
+Method	GetTextHandle
+		- made const, so can call from const equalsString etc.
+		
+		
+Method	SetTextPtr 
+		- made const, so can call from const equalsString etc.
+		
+								  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/14
+FIX HIERARCHICAL TABLES FAILURE TO INDENT & SHOW WATCH CURSOR IN LOAD
+
+CLASS	dbHierBrowseHelper
+Method	resetTableAfterViewRestructure
+		- set numCols==numFields, don't add 1 for disclosure triangle
+
+Method	insertItemsBelow
+		- call stSetCursor to show a watch cursor whilst we twist open
+		  or load top items
+		  
+		  
+CLASS	OOF_mixOutlineItem
+Method	GetDrawContentsFromView
+		- assume starting col is 1, not 2
+		
+		
+FILE	oofpphier.cpp
+- add 	#include "stSetCursor.h"
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/23
+NEW GUI - USE GUI ADAPTORS IN MFC & COMPILE NEW GUI WITH VC5
+
+CLASS	dbEditHelper
+Method	linkField(..., dbGuiAdapter*...)
+		- removed
+		
+		
+Method	linkField(all others)
+		- use dbAbstractEditHelper::linkAdapter		
+
+
+CLASS	dbGUI
+Method	ConfirmRevert
+		- moved PP version into generic file, doesn't need platform-specific
+
+
+CLASS	dbBrowseHelper
+Method	highlightRecNo
+		- pass select param through to dbTableDisplay::highlightRow		
+		
+		
+CLASS	dbTableViewDisplay
+Method	highlightRow		
+		- take 2nd bool param (but ignore for now)
+		
+		
+CLASS	dbListBoxDisplay
+Method	highlightRow		
+		- take 2nd bool param (but ignore for now)
+		
+FILE	oofppx.h
+- removed decl of OOFmsg_GetDisplayTableHandler as now in oofmsg.h		
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/25
+MAKE HIERARCHICAL TABLES SUBSCRIBE TO GUI
+
+CLASS	dbHierBrowseHelper
+Method	appendLevel
+		- call subscribeTo the GUI of the first level's view
+
+
+CLASS	dbBrowseHelper
+Method	ctor
+		- pass the view's table up to dbAbstractBrowseHelper
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/25
+MOVE MORE FUNCTIONS INTO GENERIC GUI
+
+CLASS	dbGUI
+moved methods to oofgui.cpp without editing:
+- ConfirmDelete
+- newRecord
+- saveRecord
+- deleteRecord
+- revertRecord
+- cloneRecord
+- GetDisplayTableHandler
+- isOOFILEcommandEnabled
+
+moved methods to oofgui.cpp, replacing Mac SysBeep with oofRuntimeEnv::beep
+- goFirstRecord
+- goLastRecord
+- goNextRecord
+- goPrevRecord
+
+
+CLASS	oofYNC
+Method	all except msgBox (ctors, dtor etc.)
+- move PPlant versions to oofgui.cpp
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/16
+PROTECT USE OF RTTI
+
+check OOF_RTTI_ENABLED before use of dynamic_cast in:
+- dbEditHelper::currentGUItarget
+- dbHierBrowseHelper::highlightedItem
+- dbHierBrowseHelper::highlightedOID
+- dbHierBrowseHelper::highlightedSelection
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/11
+FIX BUG IN NEW HIER BROWSER - FAILURE TO SELECT SINGLE COLUMN TABLES
+(complete removing assumption that col 1 contains disclosure triangle alone
+and no data)
+
+CLASS	dbHierBrowseHelper
+Method	highlightedOID
+		highlightedSelection
+		highlightedItem
+		- remove check if col==1
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/12
+ADAPTING CHECKBOXES & OTHER CONTROLS.
+
+CLASS	dbGUIAdaptLControl
+Method	setValue
+		- made non-const
+		- take int instead of long
+		
+Method	equalsValue
+		- removed - handled by dbGuiAdapter now
+		
+				
+Method	getValue
+		- return int instead of long
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/21
+ADD BRUNO'S GUI FIX (SYMPTOMS UNKNOWN)
+
+CLASS	OOF_mixOutlineItem
+Method	selectItemRecord
+		- remove local 'bool' preventing return value from selectJustOID being
+		returned from this method
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/20-22
+USE GUI FIELD LINKING TO EDIT CELLS IN REPORTS
+		
+CLASS	dbGUIAdaptEditPane
+Method	setFieldLink		
+		- cope with being reset, to avoid locking database and adding attachment again
+		
+
+CLASS	dbGUIAdaptLControl
+Method	setFieldLink		
+		- cope with being reset, to avoid locking database and adding attachment again
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/22
+FIX BUGS - SIZE OF FIELD NO LONGER LIMITS ENTRY
+
+CLASS	dbGUIAdaptEditPane
+Method	setFieldLink
+		- check if dbChar field and call setTextEntryLimit
+		
+
+CLASS	dbGUIAdaptLEditText
+Method	setTextEntryLimit		
+		- added using SetMaxChars
+		
+
+CLASS	dbGUIAdaptLEditField
+Method	setTextEntryLimit		
+		- added using SetMaxChars		
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/28
+FIX BAD STRING IN #pragma
+
+CLASS	dbEditHelper
+Method	currentGUItarget
+		- add closing quote to #pragma error so doesn't affect editor colouration
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/10/26
+COMPATABILITY WITH LATEST POWERPLANT HEADERS FOR PRO6
+
+rename all PP types to match - new signatures, dropping old PP types	
+	Int8 -> SInt8
+	Int16 -> SInt16
+	Int32 -> SInt32
+	Uint8 -> UInt8
+	Uint16 -> UInt16
+	Uint32 -> UInt32
+	Char16 -> UInt16
+	Uchar -> UInt8
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/03
+FIX MINOR BUG WITH OOFYNC FROM CONTACTS TEST - REGENERATE WITH APPMAKER CD 13
+
+oofync.ppob had resource matching old - regenerated from oofync.am using
+AppMaker to use new classes but retain the LPicture from the old instead
+of using LPictureControl as the new class lacks a method to change the
+picture, as used in CYNCDlg::SetIcon
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/27
+CARBONISING OOFYNC
+		
+CLASS	CYNCDlg
+Method	FocusDraw
+		- GetAuxWin getting color table & setting background colour
+		  made only non-Carbon
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/06/25
+REMOVE USE OF OBSOLETE LGADIALOGBOX IN PP 2.1.1
+
+FILE	oofppyn.cpp
+Conditionally define PARENT_DIALOGBOXCLASS and #include
+either LGADialog.h or LDialogBox.h depending on
+__PowerPlant__	< 0x02118000
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/04
+REMOVE USE OF OBSOLETE LGADIALOGBOX IN PP 2.1 (Pro5)
+
+After realising LDialogBox was around even earlier...
+
+FILE	oofppyn.cpp
+Conditionally define PARENT_DIALOGBOXCLASS and #include
+either LGADialog.h or LDialogBox.h depending on
+__PowerPlant__	< 0x02108000
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/19-21
+ADD RELATED DATA ENTRY VIA POPUPS
+
+CLASS	dbGUIAdapterFactoryPP
+- added to make linkField methods simpler
+
+CLASS	dbEditHelper
+Method	linkField
+		- remove many variants, using a temporary dbGUIAdapterFactoryPP instead
+
+Method	linkPickField
+		- added to call linkPickAdaptor
+
+
+CLASS	dbGUIAdaptLStdPopupMenu
+- added simple subclass of dbGUIAdaptLControl to set mIsValuePicker
+
+Method	setValueList
+
+
+CLASS	dbGUIAdaptLPopupButton
+- added simple subclass of dbGUIAdaptLControl to set mIsValuePicker
+
+Method	setValueList
+
+
+FILE	oofpp.h
+- added forward decl of LPopupButton, LMenuController
+
+
+FILE	oofpplk.cpp
+- added #include <LPopupButton.h>
+- added #include <LMenuController.h>
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.4 PUBLIC RELEASE
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

@@ -1,0 +1,1985 @@
+OOFILE GUI Design Decisions
+This document contains debates over the way in which the GUI interface classes
+should work, both in general and in framework-specific cases.
+
+For strictly database-related agonizing see OOFILE Design Decisions.
+
+Note: for brevity,
+PP = PowerPlant (the Mac framework shipped with Metrowerks' CodeWarrior)
+AM = AppMaker (a Mac design & generate tool)
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/11/16
+zApp GUI INTEGRATION
+The main alternatives seemed to be between an intrusive (NeoAccess?) approach of
+layering everything and providing Doc & App classes everywhere, or fitting into
+the philosophy of the host frameworks. I prefer the latter.
+
+Accordingly, I will put together a set of lightweight classes for multiple
+inheriting into zMDIFrame (zApp) and subclass the editing fields. The philosophy
+is to make as few changes as possible to generated code and make those changes
+easily.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/11/26
+ADDING VBX browser
+I've decided to offer a very clean interface to the Farpoint Spread/VBX for zApp
+customers (ie: put in oofzApp). The table will take the same params as a zTable
+except instead a model the final param is a dbFieldList. Default behaviour for
+now will be to work out all the field widths, names etc. from that. Later I will
+look at attaching a dbRepColWidths and a list of titles.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/15
+EDIT HANDLING - INHERITANCE vs LINKING
+The first round of GUI integration classes was with zApp. This framework is more
+sophisticated than others with edit forms - it automates the process of storing
+data in the edit fields. By inheriting from the standard edit fields, and
+override StoreData(), we had a very simple way of updating the database. It was
+pretty easy to convert a form over to being OOFILE-aware, just rename the control
+classes and replace a variable with a database field.
+
+However, this approach is not provided for us in other frameworks. It would be
+easier to move between frameworks if OOFILE worked very similarly in all cases.
+
+Most importantly, if OOFILE links to edit fields by subclassing, this removes
+your freedom to subclass for your own reasons. I really think this is the
+clincher - who knows what subclasses users may need? eg: they may add their own
+validation or presentation changes via subclassing.
+
+DECISION
+1) Use a link class.
+2) have a Factory method on the dbEditMgr so just call MakeLink with the control
+and field. This also lets us choose how we implement links - maybe separate
+objects or maybe just a list! MakeLink should be overloaded to provide
+typechecking on the mixtures of fields and controls it accepts.
+
+This abstraction gives us a lot of flexibility - a dbFieldLink subclass could
+communicate with a different source of data (eg: a comms link) to update a field.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/17
+TO MIXIN OR NOT TO MIXIN, A STICKY QUESTION?
+A similar debate to the field linking debate is how to standardize behaviour such
+as a List Window (or Document) launching a dialog in response to the Add button.
+
+Alternatives:
+1) use a subclass and require the user to inherit
+2) use a mixin and require the user to inherit
+3) create a helper class and expect the user to call if they want.
+
+Advantages:
+1) allows you to trap standard methods such as ObeyCommand
+2) Not difficult to add in as we are not affecting their inheritance hierarchy
+3) can just forward declare the helper classes and only import their headers into
+the cpp files. This limits interface cross-over
+3) even easier for users to incorporate into existing programs.
+
+Disadvantages:
+1) PP and AM use named scopes to do things like pass ObeyCommand to a parent
+1) & 2) expose the OOFILE GUI classes all over the place
+2) mixins add overhead in resolving function calls
+3) Prevents use of virtual methods for user customising actions
+
+DECISION:
+2) use mixins, mainly to give the flexibility of virtual calls, 
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/17
+WHO LAUNCHES EDIT WINDOWS AND HOW
+Contexts:
+1) there's an explicit Document class  VS  (zApp) the Window is the Document
+2) edit dialogs (Add/Mod) may be launched from list windows OR sometimes without
+a list visible - as a result of a search or an Add command.
+
+Thoughts:
+- requiring a Document class may offend people where their framework doesn't support this model.
+
+- keep it very simple for the List to launch editors - it's probably most common
+
+Original Idea
+Separate helper classes at 3 levels - Doc, List and Edit.
+
+Realization:
+Doc and List have very similar responsibilities
+- launching editors
+- managing a database selection
+- the mechanics of scrolling a list browser are not related to the role of the
+List window in launching items, however the List window still receives commands
+locally from Add buttons etc.
+
+List windows add the display of the database selection, but we may have other
+paradigms for display (eg: not a list but just a count of current records).
+
+DECISION
+Have just a Doc helper class referred to by both a Document and List window.
+When we have a List window with our own list objects it may be linked to the Doc
+Helper, so double-clicks can be sent directly. This would also let the Doc Helper
+provide feedback to change the highlighted item when the user moves records
+within an edit window.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/09/19
+SHOULD WINDOWS KNOW THE DETAILS OF THEIR DATABASE
+If you have a "dumb" window which adds no logic other than automatic behaviour of
+dbBrowseHelper, then its SetDatabase method passes a view onto dbBrowseHelper -
+the window knows nothing about the database.
+
+However, if the window contains controls which affect the database, then the
+window must have a member pointing to the database.
+
+Thus, to allow for this growth in general, we should adopt this policy.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/09/30
+FIXING BUG WITH RACE CONDITION WHEN EXIT DIALOG VIA MOVEMENT BUTTONS
+Problem:
+- when we leave the dialog having updated it, a message is sent to the document
+helper indicating this change. If a browser is attached, the document helper
+notifies the browser to reload data (this mechanism will become more
+sophisticated later).
+
+- if we are leaving via a movement command, the dialog's table must do a relative
+move
+
+- if the dialog's table is just a pointer to the browser's table, the current
+record is moved by the reloading of the browser
+
+Thus:
+- the dialog must have it's own record context on the file
+
+Side Benefit:
+- this makes opening multiple records relatively trivial
+
+Answer:
+- simply copy the dbTable - the replication logic already copes with this
+situation, replicating (inside OOF_tableBackend_ctree) the smart-pointer
+OOF_ctreeSelection. A selection can have multiple iterators on the same base set
+of records.
+
+Caveat:
+- the copy needs to be of the exact type of the table, not the parent dbTable,
+thus must take place in the user's dialog::SetDatabaseTable(). However, we can
+hide the deletion back in the dbEditHelper.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/04/25 - 28
+REMOVING ASSUMPTIONS in GUI INTEGRATION
+The current PowerPlant integration & AppMaker templates assume a model of a
+single browser window for the entire database.
+
+The Mercator (MacKIDMAP) project has a lot of windows/dialogs which break the
+current GUI integration philosophy of drill-down from a list window to editing
+dialogs.
+
+1) Many "info" windows have a browser with editing fields alongside.
+Double-clicking the browser loads the current record.
+
+2) Some windows have multiple contexts, from different databases, and a "copier"
+style of interface which creates records in one list based on a selection in
+another.
+
+Assuming the database schema is globally visible (via an include) we can remove
+the need for parent (eg: Doc) of a window to know what database files that window
+edits/browses. If the dbTables are members of the dbConnect, then the only thing
+that needs to be passed around is the dbConnect. This serves as a prototype - if
+any window contains a browser then the browser makes a clone of the relevant
+dbTable.
+
+We can remove the other coupling, telling windows if records changed, by using
+the dbTable broadcasting model.
+
+The obvious dependencies:
+- save an edited record - browsers are dirty
+- move records in an editor - maybe advance a browser selection
+- delete a record in an editor - browsers are dirty
+
+There's also the long-standing question of ensuring a single record alone is
+loaded - see the OOFILE Design Decisions core doc.
+
+
+Goals of the new model:
+- deciding which/any windows to open at startup is the application's job, not OOFILE.
+
+- window creation should not be customised in any way for OOFILE. The current
+Data class generated by AppMaker can contain OOFILE tables.
+
+- windows can contain a number of browsers as well as an edit helper (set of field editor).
+
+
+QUICK SUMMARY
+The current factory objects go - PowerPlant supplies its own factory static
+methods. The only thing we need is a user-supplied downcasting function to give
+them the correct pointer type.
+
+For a browser next to its edit area, the command attached to the browser is not
+edit but gotoRecord. This will be handled by the editing area's
+OOFILE_Handles_command first. (Note: think later of a mechanism to allow
+rejection).
+
+The command handling is always edit area first then browsers in their order of
+declaration.
+
+Browsers may have attached edit and add factory functions.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/05/01
+MULTIPLE BROWSERS ON ONE PANE
+There's a fundamental problem with command dispatch in targetting of commands.
+Spec Bowers has pointed out that menu items will have unique command numbers, so
+it makes sense for similar buttons to likewise have unique numbers.
+
+Thus, targetting multiple browsers is a redirection - the browser understands
+some commands and the pane containing the browser must redirect pane-specific
+commands to the browser.
+
+Let's break browser behaviour down a bit:
+1) New Record
+   - creates new record
+   - invoke an editing context
+   - (via dependency?) update browser after editing complete
+
+2) Double-click/Edit Record
+   - load record matching selected row
+   - invoke editing context
+   - (via dependency?) update browser after editing complete
+
+3) Delete Record
+   - delete the record
+   - update browser
+
+Invoking an editing context can be by specifically knowing a window or dialog to
+launch, or again just dispatching a message. The advantage to the latter is that
+it is more likely to be portable, and allows for other consequences.
+
+So, the solution seems to lie in:
+a) provide a mechanism for the pane to map one command to another
+b) provide messages to the browsers's helper for it to re-despatch
+   - to invoke an editor for a new record
+   - to invoke an editor for an existing record
+   - to confirm deletion
+
+In the context of AppMaker code generation, we can fake a) for now by hard-coding
+the relevant browser name in the command code segment, rather than adding another
+flavor of command.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/05/01
+BROWSER HELPERS, CLONING AND STATUS DEPENDENCIES
+
+Take two common UI patterns:
+1) "list" window provides browser to double-click and a few buttons, with edit dialog invoked.
+
+2) browser is on same screen as edit area.
+
+In both cases, the edit area needs to have a different iterator to the browser
+(simple refreshes alone require the browser to be able to iterate the database).
+
+In case 1) we create the edit area AFTER the browser.
+
+In 2) the order is indeterminate.
+
+ISSUES
+- notifying each other of changes (add, del record) which takes the form of:
+  - request to edit area (if active) to OK leaving current record
+  - message from edit area to browser to say data saved
+
+- want to avoid copying a selection (performance issue, minor for now)
+
+QUICK HACK FOR KIDMAP (browser on edit screen)
+The edit helper is created first and directly uses the database.
+The browser helpers are specified as dependents of the original dbTable, and have
+a clone for iteration.
+
+When a BrowseHelper receives a message, it forwards
+- deleteRecord by deleting an item from the selection
+- saveRecord by dirtying the selection (if it's a new record also add a row)
+
+WEAKNESSES
+This doesn't help with the model where there's a browser and a separate edit screen.
+
+From discussion with Ken, it is very desirable to have a general model for
+updating views on shared data (this is standard MVC model). However, if this is
+incorporated in the OOFILE core it becomes a nuisance filtering out the unwanted
+messages.
+
+Thus the clean way is to have it as a parallell framework. Unless/until convinced
+otherwise I think this should just be part of the GUI framework.
+
+SOLUTION
+All helpers register with a global class as dependents, FOR A GIVEN dbTable.
+
+Certain actions (new, delete, clone, save) are broadcast by this global class,
+which rebroadcasts (to all except the originator).
+
+This implies that the helpers are multiple listeners - they not only listen to
+this global coordinator but they also may be listeners locally (eg: to a menu).
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/06/04
+POWERPLANT DIRTY FIELD DETECTION
+PowerPlant lacks inherent flagging of fields as being dirtied (unlike Windows
+where this is built into the controls). There are two mechanisms we could use:
+
+1) subclass the controls and override UserChangedText to set a dirty flag.
+
+2) use an attachment to the control which flags that the control has been dirtied.
+
+A refinement of 2) would have the attachment tell the LinkField that the field
+has been dirtied, then remove itself. Thus, the attachment won't be sitting there
+receiving every single keystroke message etc.
+
+Option 1) may be simpler but introduces the headache of subclassing (restricting
+future subclassing) and requires changes to the AppMaker code generation.
+
+Option 2) may be slightly slower and adds a RAM hit of an attachment per edit
+field. However, it is clean and can be hidden totally within the LinkField
+classes (they will create the attachments). Thus, unless it becomes too much
+overhead, we will take that approach for now.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/06/09
+GETTING THE SELECTED RECORD FROM A BROWSER
+eg: in the Kidmap or Contacts2 interfaces, we issue a command (by button or drag)
+that should copy an item from one browser to another.
+
+Typically, the destination browser's view is not on the same dbTable as the
+origin, but is via a link dbTable (ie: there's an MN relationship between the
+editor that contains the destination dbTable, and the class shown in the origin
+table).
+
+The problem is that currently changing the visible selection on the
+LTextTableView has no effect on the backend storage. We need an explicit call to
+synch the two, or auto-synch.
+
+ALTERNATIVES
+Auto-sync (goto a database record on every click) is attractive because it is
+invisible to other objects - they can assume the data model and visual
+presentation are always consistent.
+
+However, it has a few problems with implementation. Due to the separation in the
+LTableView family, there's no simple mechanism for the backend storage to change
+state with a visual change.
+
+One possible approach is to subclass LTextTableView and add a SelectionChanged()
+override, which will notify the browser helper, which can then change the
+database selection. This is probably cleanest, but involves subclassing.
+
+FOR NOW
+Explicitly tell the browse helper to update its database state, adding a
+gotoSelectedRecord method.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/06/17
+RESOURCE NUMBERING CONVENTIONS FOR REPORT-WRITER ETC.
+Under the present (WASTE hack) implementation of the report-writer, there are a
+few standard resources required. These will be numbered starting from 29000 (to
+hopefully avoid conflicts) and the resource constants be defined in oofmac.h.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+DEPENDENCIES IN EMBEDDED BROWSERS
+96/06/20
+
+The Kidmap project, with many related selections, has shown that the current
+PowerPlant browsers (and general GUI model) doesn't work. There's nothing forcing
+the browser to resize its display when the selection changes. The redrawing might
+pull in records correctly, but the LTableView display is not informed that the
+number of rows has changed. This causes either too few rows to be displayed, or a
+crash when non-existent records are drawn.
+
+It seems clear a move to a more robust model is required, something where the
+display is driven from the data. For a quick hack today, the existing model will
+be retained but a dependency added so the table rows can be corrected. We already
+have dbHelper as a receiver, so the easiest place to apply the hack is to
+dbTableViewDisplay. This can respond to OOFmsg_ChangeSelection by comparing the
+new selection size and seeing if it needs to add or delete rows.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+GUI LINKING
+96/08/01
+
+ESSENTIAL POINTS
+1) From the developer's viewpoint, everything that's logically part of the same
+dbTable should be linked to it. They should be able to change that selection and
+have editors, browsers simultaneously updated. Creating GUI components should not
+require explicit cloning of the dbTable.
+
+2) When dragging between lists, it should be a one line call, something like
+lhsController.appendSelection(rhsController);
+This can wrap all the tasks of:
+- telling the presentation layer to add a record, or adding to the model and then
+  updating the presentation
+- copying data
+- forcing redraws
+
+3) There should be one point of handling user commands, not a cascading series of
+browsers.
+
+4) The model needs to support other, non-related tables being displayed on the
+same window, eg: the sources for dragging in Kidmap.
+
+5) When the window is left, if it is still active, the active GUI on the dbTables
+must be changed. Thus the dbGUI class associated with a dbTable will change, or
+the dbBrowserHelpers and dbEditHelper must unlink themselves.
+
+Another way to support this, which supports multiple *visible* windows is to have
+multiple dbGUI's linked to a given dbTable.
+
+Further thinking (and discussion with Ken) suggests the dbGUI doesn't need to be
+disabled or bound to a specific window. It refers to helpers that are bound to
+different windows (and have a lifetime of that window).
+
+
+For other processing, it may be nice to use a dbView in isolation of the table.
+There seems to be a nice synergy by having the dbView as a cloned iterator,
+sharing the table's selection and receiving any messages of changes of selection.
+The limitation this imposes is on how many editors can share the table - it seems
+reasonable to say there can be only one.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+CONSTRUCTING DIFFERENT GUIS
+96/08/02
+
+From the above discussion, it seems certain the dbTable will have to have some
+knowledge of the GUI, in terms of being able to return a dbGUI pointer.
+
+This raises the issue of how to use OOFILE without a GUI, and how to generate the
+correct dbGUI depending on the platform. We want to avoid #ifdef's and have
+linking alone govern what form of GUI we're using.
+
+It would be nice if the GUI could also alert the user if they mistakenly linked
+in more than one GUI.
+
+The solution is to define an abstract dbGUIFactory class. dbTable will have a
+static pointer to the dbGUIFactory, which will of course be 0 in the absence of
+any GUI.
+
+Each GUI library has a static dbGUIFactory descendent. This sets
+dbTable::sGUIFactory = this;
+
+Thus, once static initialization is complete, the runtime can generate gui's as
+needed. The dbGUIFactory ctor's can also check if another GUIFactory has already
+been set, and generate an (early) runtime error message about multiple GUI's
+linked.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LIVE LIST UPDATES
+96/08/04
+When we have a list adjacent to an editing area, the UI works best if the list is
+live-updated from typing in relevant fields.
+
+A given is that the current record should be visible at all times unless the user
+explicitly scrolls it out of sight. Thus, when the list is resorted, it must
+auto-scroll.
+
+Ken's suggestion:
+- the list caches the values for the current record
+- on character entry, the fields send the list the new values
+- sorting the item should occur on idle, or possibly wait until save record (My
+  preference - it links the save to another behaviour instead of the user seeing
+  the list scroll all by itself.)
+
+Alternative (my original ideas)
+- the fields update the OOFILE record on each keystroke
+- the shared database implies a shared dirty-record cache
+- the list's notified of these updates and redraws just 
+  that item (no need to invalidate the entire list)
+  
+Other comments - the lists should cache visible items to speed redraws, rather
+than hitting the database directly. In particular, causing refreshes of the
+entire list pane, or dialog, for other reasons should not incur that kind of hit.
+(How does this reconcile with M/U????) My original thinking here was that smarter
+object caching in OOFILE would yield the same effect, transparently to the
+interface objects.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+REACTING TO LIST CLICKS
+96/08/09
+When clicked or double-clicked, an LTextTableView broadcasts a message (specified
+in the resource) and passes itself as the parameter.
+
+There are 2 ways we can use that LTextTableView* in handling the event:
+1) go straight back to the table, to get the selection
+
+2) search the helpers to see who manages that view, then deal with the
+dbBrowseHelper we find.
+
+
+Tasks:
+- get the clicked record number
+- leave the current record (if different)
+- change current record
+- broadcast the change
+
+This doesn't seem to require anything other than the selection being obtained as
+a standard PP action (GetFirstSelectedRow) and so option 1) seems sufficient.
+
+However, using option 1) breaks the current abstraction of table types (hidden
+under the dbTableDisplay abstract class).
+
+The main concern with option 2) is the overhead of broadcasting a message each
+time. Using a cache of the pointer being compared, and the resulting
+dbBrowseHelper* should optimise this fairly easily. Within a window, the user is
+likely to make successive selections from the same list.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+MULTIPLE TABLES ON A WINDOW
+96/08/11
+The KIDMAP and Contact2 programs have panes where there is a related table
+listing (eg:) Organisations for the current main Contacts dbTable, alongside a
+global Organisations list.
+
+The related table can be managed by the Contacts with its dbGUI that's handling
+the normal editing messages for the window.
+
+Issues:
+1) If we keep two windows visible, adding records in one may affect the other.
+Definitely, if we drill down to one window and return, added records should be
+displayed in an allRecs list.
+
+2) There's no need to have multiple dbGUI's listening to the messages from a
+window, unless we have independent editing in parallel on the same window (eg: if
+the Organisations list were in-place editable). In that event, we'd need to know
+how to target the messages, so the default routing through the window's "main"
+dbGUI would still apply.
+
+3) If we have a related table, like Orgs, does it use the dbGUI of the main
+window (Contacts) or one created for Orgs? If the latter, we end up with both the
+global and the related table on Orgs using the same dbGUI. This seems wrong for
+update broadcasts - the related table should be dependent on changes in the base
+record.
+
+Conclusions:
+If we have multiple, independent editable entities, they need to have split
+handling of the messages - change of focus must change the chain of command.
+
+For related tables, dbTable::getGUI should go through the chain to the base
+table. This implies an easy way for a related table to return this base.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+DRILL-DOWNS & NON-STANDARD COMMANDS ON A LIST
+96/08/11
+In Contacts3, or KIDMAP, you can double-click the global Orgs list to drill-down
+to that window.
+
+The command handling the drill-down is generated by AppMaker on the Contacts
+window. It is a non-standard command and so is not handled by dbGUI.
+
+When we react to this command, the current record in the double-clicked list
+should be set to the clicked record - we want to arrive in our new window with
+the correct record being edited.
+
+There may be other commands, eg: Print Details which need to similarly get the
+current record.
+
+Issues:
+1) The OOFILE GUI classes are not in the loop - the LTableView sends the message
+to the default command handler (the window) which then reacts.
+
+2) We want to minimise extra code and have a fairly transparent solution, so this
+table could be copied to another window and used with hand-editing.
+
+
+Options:
+1) The user writes an explicit call to the browse helper for that LTableView.
+This is simple, with the main hassle being in AppMaker getting the exact names
+correct due to the uniquifying process.
+
+2) The dbGUI for the global Orgs is used to pick the correct record, much as
+happens when handling dbEdit in dbGUI::msgForOOFILE. This single explicit line of
+code would be totally portable and not rely in any way on the user entering the
+name of any current window items. One corollary of this approach is we need to
+pass the ioParam down into the DoBlah methods.
+
+3) All screens using a dbGUI call some form of 'reconcile' command before
+creating local browsers etc. This won't work for a few reasons, mainly it forces
+us to keep the previous browsers live to preserve their selection.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+GENERATING & INTERFACING SELECTION-BASED LISTS
+96/08/11
+In some screens, eg: KIDMAP report options, we want to build a list that's a
+selection of records in the current database. Thus, the dbView in the list, and
+the dbTable it refers to, are neither the main database table nor a related clone
+- the dbTable exists as an independent selection.
+
+AppMaker Issues:
+1) how do we setup this selection 
+- should we allow a code fragment to be attached to the source
+- is the source a member of the window or just local?
+
+2) how is the name of the selection specified?
+- maybe have an alternate field for view source - that also lets us specify related tables.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+APPENDING DATA FROM A SELECTION
+96/08/11
+The KIDMAP software has two distinct cases:
+1) we have a related table on the rhs, and are adding links by appending the
+selection from the lhs (showing the global table)
+
+2) the rhs table is just a temp selection (eg: report options selecting some
+records) and doesn't represent a persistent set of records.
+
+It would be very nice to hide this difference, so the simple generated (or
+hand-written) code had a single line, something like:
+rhsHelper->appendSelection(lhs->Helper);
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/02
+OUTLINE TABLE - GETTING THE HIGHLIGHTED LEVEL
+
+The current highlightedSelection() method for an outline table is used to enable
+drop-in replacement of LTextTableView and assumes you always want to traverse the
+table to the bottom-most items. It has the nice benefit of allowing you to select
+at various levels, and returns all the nested bottom items.
+
+However, when we are doing things like editing a hierarchy we want to get the
+selected level. The info needed:
+- the record selected (so we can possibly copy data from it)
+- the parent level into which we are inserting. This may be the parent of the
+selected item, or the selected item, depending on the program.
+
+Getting the selected record is a matter of getting the selected dbViewOutlineItem
+and using its oid. The dbHierBrowseHelper could have a method returning just that
+selection, OR it may be best to do it in two stages, getting the item and then
+the table, so we can have user code query the item as to what level it's at.
+(Remember some outlines have different tables at each level - if we want to
+downcast we have to know the indent level!)
+
+This implies adding methods:
+dbViewOutlineItem* dbHierBrowseHelper::selectedItem() const;
+dbTable* dbViewOutlineItem::cloneSelectedRecord() const;, OR
+selectItemRecord();
+
+Note:
+The behaviour depends on whether the level is expanded or not. If we are adding a
+sibling, it will always be visible. If we add a child, it is only visible if the
+level has been expanded.
+
+Keep a sense of separation here!
+
+Differentiate model (ie: database) updates from the visual.
+
+VISUAL Updates
+- if the level is not expanded, nothing visible changes
+- if the level is expanded OR we are adding a sibling (same case, for parent 
+  level), we have a subcase of:
+	dbViewOutlineItem::ExpandSelf()
+	{
+		mHelper->insertItemsBelow(this);
+	}
+
+
+This logic could all be wrapped in dbHierBrowseHelper with a couple of methods:
+- insertSibling(dbViewOutlineItem*, oidT oidToAdd)
+- insertChild(dbViewOutlineItem*, oidT oidToAdd)
+  which checks if item is expanded and does nothing if not expanded
+
+
+
+MODEL Updates
+This can't be generic - we just have to get an oidT back from the created record.
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/06
+ENABLE USER TO CHANGE FIELD LINKS
+
+- allow replace link OR allow link to have field changed
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/12/07
+GUARANTEE RECORDS AVAILABLE FOR GUI TO READ
+This comes as a consequence of user changing field links - we may not have the
+explicit newRecord() on a related record.
+
+The easy, although a bit bloody-minded way, is for every copyFieldToLink() to
+guarantee a record exists. A cleaner way is similar but optimise it by having the
+dbEditHelper::copyLinksToFields and the link's setField routines the only ones to
+perform the check. This implies the dbEditHelper keeps a list of all the tables
+being edited, but could avoid dozens of redundant checks.
+
+Note: it would be appealing to bury this in the engine, in
+dbTable::ensureRecordLoaded() but the error test in there has already revealed
+other OOFILE core bugs, so I'm loath to cause side effects.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/05
+READ-ONLY FIELDS
+
+With a read-only record, you can copy from some fields but generally not write to
+them, with some exceptions dependng on the user application.
+
+There are several ways that read-only fields can be accomplished, and two issues:
+- how do we implement read-only status for a generic field
+- how to control read-only status.
+
+1) Subclassing
+Subclassing edit fields to make them read-only-able is feasible but would require
+a lot of manual code changes and PPob class changes. This makes it a tough
+decision for users to roll in late in a project. We want this to be fairly
+transparent to user code. It also goes against the princple of avoiding
+subclassing for standard database interface behaviours.
+
+2) Attachments
+Using an attachment, the attachment can intercept all keystrokes (other than
+arrows) and the Cut and Paste commands.
+
+As a general extension to OOFILE, dbEditHelper could have a
+enableFieldReadWriteControl() method that makes the addLink methods create a
+readWrite attachment. The user can then call a single method on dbEditHelper to
+make the entire set of fields read-only. If there are any exceptions they can be
+re-enabled after.
+
+Note: controlling the R/W status of single fields will require going via the
+dbEditHelper as there is no way to get an attachment of a given type back from
+LAttachable.
+
+For MFC this issue won't arise as the common controls provide read-only behaviour
+without disabling.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/27
+FIX FAILURE TO MARK DIRTY
+Problem was use of single dbLinkDirtier class which only responded to typing and
+cut/paste type messages and thus when attached to checkboxes, radios and popups
+failed to notice a change.
+
+If we have another kind of link that reacts to clicks, it will handle these other
+controls, and can be the default.
+
+In the process realised that our dirtying is not very accurate as it doesn't cope
+with undoing change via the Undo command or manual change.
+
+Thus, move to a model where the dirtier sets a tentative dirty state, confirmed
+by comparing the control value with the buffered field value.
+
+In the process noticed the overhead of our deleting the dirtier and re-creating
+it when the record is reloaded. This won't track any changes occurring after a
+save, so change this so the dirtier remains.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/28
+GETTING LINKS BACK FROM HELPERS
+The current lean-n-mean design of the links has the mLinkTo field contained at
+each concrete level, of the appropriate pointer type.
+
+It has become clear that in some circumstances a programmer will want to pass in
+a control pointer (an LPane* in PowerPlant) and get back the relevant link.
+
+This means we need a way for a base dbFieldLink* method to compare pointers. The
+alternatives are: 1) have a virtual method paneMatches() which compares the
+LPane* base pointer with the LCaption* or other subclass pointer stored in the
+concrete link. (Note: this adds the space of a virtual function pointer in the
+vtable, as well as the runtime cost of a virtual call.)
+
+2) copy the subclass pointer into an mBaseLink member of dbFieldLink. This adds
+storage for one pointer as an overhead but will be fast as the non-virtual method
+can be inlined.
+
+3) Use a base class pointer in dbFieldLink and downcast it in the concrete links.
+This has the performance benefit of 2) without the space cost, but results in a
+bunch of downcasts in the concrete methods.
+
+On further examination, 3) turns out not to be as ugly as feared as the
+GetValue() and GetDescriptor methods that are used in the vast majority of links
+are actually virtual on LPane. Only the TextEdit links need downcasting.
+
+DECISION: use 3) as it gives performance without space cost.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/09
+ADDING FROZEN HEADER ROWS, EG: FOR A DATABASE BROWSER
+
+The decision to extend the PowerPlant LTextTableView class to provide for frozen
+rows means we can hide whether headings are used or not solely within the driving
+OOFILE classes.
+
+Given an interface on dbBrowseHelper that says we display headings, it will
+create the display class with the appropriate parameter, which can then set the
+frozen rows.
+
+If a frozen row is used to provide a header row for the database browser, we need
+to offset the table storage object so row number 2 is now mapped to record 0
+(instead of row number 1) and row number 1 is fed the dbView headers.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/24
+TRIVIAL DECISION ON HOW TO PROVIDE READ-ONLY STATE CHANGE BROADCASTS
+
+When an editHelper is changed to a readOnly state it needs to broadcast the
+change. In the PowerPlant interface we are implementing readOnly with an
+attachment. The clickAttachment used on other than edit panes prevents the panes
+from being clicked but doesn't affect their appearance.
+
+This is bad UI. We can't disable edit panes as they are still selectable and
+copyable, but must disable the others to indicate why you can't popup etc.
+
+Choices are:
+- clickAttachment disables pane on if readOnly, so visible change doesn't occur
+  until clicked
+- dbFieldLink::readOnly disables panes based on a mDisableReadonlyPanes flag set
+  by subclass ctor
+- readOnly is made virtual and re-implemented for each generic pane case, or text
+  edit case.
+
+Decision:
+using a flag lets us keep an inlined direct function call on dbFieldLink and make
+this common operation a lot faster, and requires less code than providing
+overrides. The only disadvantage is having to edit the ctor's.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/26-27
+ISSUES WITH CLONING RECORDS IN A GUI FORM, VALIDATION & CALCULATED FEEDBACK
+
+Take the example of a Student in KIDMAP - they have a unique ID field and some
+calculated fields.
+
+These both present dependencies:
+- the unique ID field should be optionally calculated and should be blank on new records
+- we want calculated fields refreshed when the fields they are based on are updated
+- we also want formatted fields updated on exit (eg: dates, numbers)
+
+A simplistic way out would be to update all calculated fields when any field is
+updated. This is a little inefficient but provided there are not many calculated
+fields it will work.
+
+Another way to force updates is whenever we move off a field. We can tell when
+we've moved onto a new control from the messages msg_Click or msg_TabSelect.
+
+When we move off a field, from the field link level we need to somehow inform the
+edit helper. This implies a link in some manner from the fieldLink to the
+editHelper, and the simplest approach is to pass in the editHelper at the time it
+manufactures the fieldLink, or takes it in adoptLink.
+
+Having detected the change, there are two kinds of actions:
+- updating displays (calculated fields and format masks)
+- validating fields
+
+Updating displays is a field level decision, so we will call all fieldLinks with
+an updateDisplay method, that can either update a calculation or use a format
+mask. It has to be at the link level because only the link has info (dirty link)
+to know if default calculators should be used.
+
+The whole issue of when to validate fields is a vexed one, with some people
+preferring field-by-field validation and others preferring deferment for the
+entire form.
+
+For now, validating at leave or save record time is easiest and a common model.
+Later we should probably offer a field-level validation. (Which raises the
+question of how to return to a field - Cmd_SelectAll will work for edit fields
+but what about a popup menu?)
+
+Validation is based on asking the field to validate a candidate value in a
+fieldLink.
+The kinds of validation we can offer are:
+- dates
+- numeric ranges
+- character length (fixed-length fields, not really necessary as we set PPlant max len)
+- unique keys
+
+Validation will take place in a loop through all fieldLinks, with failure on the
+first causing an error message and selection of that field.
+
+Unique keys is the hardest thing to do. We basically need a way for the field to
+test if a value is unique. A rule which works for new or old fields is:
+- if the field content is different from its old value
+- if a search finds a record, there's a key conflict
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/26
+IMPROVING RESPONSES TO STATE CHANGES IN GUI'S - NEXT RECORD BUTTON
+
+There is a bug in the current version where a button broadcasting a NextRecord
+message will cause the edit helper to advance, but not the highlighting on the
+browser.
+
+We are currently broadcasting an OOFmsg_ChangeSelection rather than anything
+specific like moveRecord. A simple fix (in fact matching the Booch object
+diagram) is to have the browser reaction change the highlighting to match. We
+can't hide this down in refresh as that may be called explicitly for other
+reasons.
+
+Later it might be nice to optimise this with specific messages, possibly more
+efficient way of working out where to highlight.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/28
+BROADCAST MESSAGES FOR CHANGE OF STATE
+The initial intent was for the user to subclass dbEditHelper if they wanted to
+intercept behaviours such as leaving the record.
+
+It has since been pointed out this may be inconvenient in generated code and a
+messaging model that fits into PowerPlant messages would be more intuitive.
+Accordingly, for every hook, we'll fill in the previously empty stub with one
+that sends a message, so the user can provide some messages. With no change to
+user code there will be no behavioural change.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/03/02
+FIXING THE SAVE/REVERT/UPDATE MODEL
+In the preceding work on getting calculated fields to be updated on the fly, a
+large hole has been uncovered in the logic of our save/revert cycle.
+
+In order for a calculated field to use data that's just been typed in, that data
+must be in the database.
+
+We are currently only copying the data back from the edit controls to the record
+buffer at Save time, therefore calculated fields continue to read old data.
+
+There seem to be two ways out of this:
+- a new model of calculated fields which has dependencies on GUI controls and
+gets updated data
+- copy data back to the dbField's on leaving the edit control, which implies a
+secondary buffer (or reload from disk) for Revert.
+
+
+
+The second option gives us the chance to eliminate the current GUI dirtying logic
+(based on a state change each character typed) as we'll be dirtying the main
+table each time we (conditionally) copy a field back. We are also converging -
+only the main table's dirty state will be used, rather than having two
+definitions of dirty (the table and the edit helper).
+
+This implies detecting departure from the last field, so it is copied, but we no
+longer copy all values back from the edit helper in a loop.
+
+LATER - found in practice it's still worth being notified of changes to fields
+and a maybeDirty() state anyway to avoid the comparisons on leaving fields, which
+with lazy-loaded fields may be quite a lot of work.
+
+Revert should be asked of the list - do we have a (lazy) second copy of table, or
+do we reload from disk to get the "old" copy. (Use the latter for now).
+
+Other problem identified - the KIDMAP Back command doesn't perform any GUI
+checking and so the Y/N/Cancel won't be cancellable. This is an application
+weakness, but suggests we need a command (cmd_dbBye) that can be called to check
+if it is possible to leave a window.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/12
+COMPLICATIONS IN AUTOMATIC LOCKING
+Current, the GUI classes support automatic locking on the basis that the dbGUI is
+used to coordinate locking. dbBrowseHelpers check that the GUI has locked the
+current record before proceeding.
+
+A problem has been uncovered in KIDMAP using such things as report setting
+screens, which don't need an editHelper on a specific table for other than
+readonly fields. Given the dbGUI manufactured by the P table, if the current P
+record is locked by another, some report setup functions will be disabled,
+despite the tables involved having nothing to do with the P table.
+
+Even worse, going into one of these report setting screens will cause others to
+be locked out of those records, unbeknownst
+
+An early attempt to fix the problem was avoiding calling dbGUI::gotoCurrentOrNew
+record. However this fails to set the record locked flag, which defaults to
+false.
+
+There may be two issues here:
+- set the record locked flag to 3 states
+  - we have record
+  - someone else locked
+  - don't care if locked
+  
+- avoiding locking records unnecessarily and so avoiding conflicts. Particularly
+consider the likelihood that a given user will wait in the report-writer.
+
+Possible solutions:
+1) simply setting the dbEditHelper to readOnly may allow us to flag to the dbGUI
+   that we don't care.
+
+2) explicitly track a weWantToLock state in the dbGUI, so this can be switched off.
+
+Decision:
+The explicit tracking is far less prone to order-dependent code errors - try it! 
+
+A little experimentation shows we need this to be on by default, for all the
+screens where we just have a couple of browse helpers. We should have a
+transparent way for it to be turned on - try having it turned on automatically if
+we link any non-standalone fields.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/07/20
+THE BROADCAST DILEMNA
+
+The dbGUI coordinator has a number of dbHelpers subscribe to it.
+
+Take as an example the KIDMAP General Recording Window which has browsers on
+unrelated databases. If there is a programmatic change (eg: in Preferences) to
+the PerformanceScale file then the programmer must also tell the GUI that they
+have changed the data, eg: mData->L_D->getGUI()->changedSelection();
+
+An alternative to requiring the programmer to do this would be for the dbGUI to
+be a listener, reacting to changes to the tables. This has a potential
+circularity, so it would then have to use a modal flag to indicate when the
+changes to the table were due to the GUI actions. Given the complexity of GUI
+actions it was thought best to start with requiring programmer action.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/09/07
+CHANGE SHIELDING - NEW RECORDS, UNIQUE FIELDS AND DEPARTING WITHOUT CHANGE
+
+Problem Scenario:
+- user presses New
+- user doesn't want new record, presses Back
+- screen won't let them leave a blank ID in there as it's not a unique ID
+- user has to enter some crap ID to be able to press Back again, at which point
+  they get a "do you want to save?" message.
+
+
+Internal Analysis:
+User presses Back
+Window application code sends cmd_dbBye
+
+dbGUI::msgForOOFILE
+- in response to cmd_dbBye
+  - broadcasts OOFmsg_AttemptLeaveRecord
+  **** should be logically possible if untouched new record ****
+  
+dbEditHelper::receiveMsg
+- in response to OOFmsg_AttemptLeaveRecord, calls LeaveRecord
+  - calls current link leaveLink regardless of why leaving
+    - if dirty, calls validToLeaveLink
+  - calls CanSaveRecord
+  
+- in response to OOFmsg_AttemptSaveRecord, calls CanSaveRecord
+
+
+dbEditHelper::CanSaveRecord
+- calls dbEditHelper::ValidateLinks
+  - calls dbFieldLink::validToLeaveForm on each field
+    - checks the current field is valid, and then mField->valueIsDuplicate
+    
+
+SUSPICION
+Essence of problem is that field is not clean. New record has a dirty field
+somehow - due to default????
+
+Turned out that Mercator had written code (CStudentInformation::UpdateLockedness)
+which always updated some fields of new records.
+
+Given that this kind of behaviour seems likely in OOFILE users, we have two
+choices in how the GUI should decide it's dirty:
+
+1) Keep the current use of the dbTable::isDirty flag as an indicator and live
+with the fact that if user code changes fields, it is treated the same as if a UI
+interaction had occurred.
+
+2) put a separate flag in the dbEditHelper.
+
+Neither of these are particularly comfortable options. The current problem with
+option 1) in Mercator's KIDMAP is that apparently untouched records either demand
+a unique ID be entered, or ask the user if they want to save when the user is
+damnned sure they didn't do anuthing worth saving.
+
+With option 2) we thoroughly break the isolation between data model and UI. In
+many cases I could argue the point that UI code should consider all changes to
+the data model as worthy of query. For instance, if a change to a UI element on
+another screen INDIRECTLY causes change to the data model of the current screen,
+should our edit helper be asked if we want to be saved? Even without visible
+change on our screen, it could be argued that our current helper has been
+responsible for loading this particular record and therefore making it a target
+for the external change.
+
+Simplistically, we could offer:
+
+3) a compile-time option (or even runtime) as to which model 1) or 2) was used in
+a given application.
+
+Or, even
+4) a Shielding capability is needed. This covers the external edits of option 1),
+but user-code that modifies state without "dirtying"  can avoid triggering the
+state. This feels like a very weighty solution, but offers enough flexibility to
+cover all cases and BY DEFAULT preserves the purity of the model. User code can
+turn on "change shielding" for too long and thus pervert the GUI's detection
+logic, but that is not as bad as the alternatives of missing external change
+altogether, or continually annoying the user with prompts to save apparently
+pristine records.
+
+Decision:
+- implement combination of options 3) and 4). Have a compile-time #ifdef to
+suppress change shielding, for people who want optimal performance, and also add
+a stack class to simplify application of the principle.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/02/05
+MERGING POWERPLANT->MFC PORTABILITY KIT AND OOFILE GUI
+
+The portability kit has a set of "shadow classes" which are used as in
+PowerPlant, as pointers, that map to a windows control (eg: LEditField maps to
+CEdit).
+
+In most cases these can therefore be used directly by PowerPlant code that has
+been copied across.
+
+However, the MFC GUI defined dbEditHelper::getLink as taking a CWnd* (like the
+Mac version taking an LPane*).
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/05
+16-BIT MESSAGING
+Under MFC (Windows limit, actually) command messages are 16-bit vs the full
+32-bit range available under PowerPlant.
+
+We need to restrict user code or actively assist users to identify weak spots in
+their applications. It seems safer to put asserts in OOFILE interfaces than to
+change the type to 16-bit integers and rely on people spotting warnings.
+
+(Note: due to bugs in Visual C++4.1 it gives thousands of 'bool' reserved
+warnings for OOFILE.)
+
+Using asserts also lets us further restrict the command range to that allowed by
+the framework rather than just the 16-bit int range.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/15
+NON-SORTED KEYPRESS FIND
+A situation recently came up at Mercator where they had an unsorted table in a
+scrolling list control, but wanted the keypress find feature to go by other than
+the first column.
+
+This is a fairly reasonable request - having a sorter attached induces some
+overhead particularly if your data is presorted (as theirs was) and static with
+respect to the sort order, but frequently updated. (Side note - we really need
+sorts to be more intelligent about their dependence on fields!!!).
+
+So, for an unsorted list, we need an interface to specify which field is used for
+the keypress find. This on the Mac is handled within
+dbViewAsTableStorage::FindCellData, which method knows the dbView concerned but
+not the associated dbBrowser.
+
+In hierarchical tables, the Mac version uses dbViewOutlineItem::findOIDforData
+which *does* know its dbHierBrowser and also gets its dbView via getting the
+dbHierLevel from that dbHierBrowser.
+
+Under MFC we have even more differing implementations.
+
+It would appear the only common point is the dbView. Thus, although I *hate*
+adding attributes to dbViews, it makes a lot of sense to have a
+defaultFindField() method on the dbView. Anything else implies adding a tangled
+mess of methods behind the scenes to try to support some kind of common
+interface.
+
+If we are going to allow application programmers to specify this field it also
+makes sense that they can use this to override the sort order. If we don't give
+them this ability then they would have to suppress sorting in order to get the
+search, although they may therefore be responsible for some bizarre UI results.
+
+Given the two decisions above, all logic to retrieve the appropriate field by
+which to search should be moved into the view. The GUI classes will still decide
+what kind of search to apply as different situations may make a >= search vs an
+== search more appropriate.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/20
+SHOW MESSAGE BOX IN FRONT REGARDLESS OF CURRENT MFC WINDOW TYPE
+
+The previous behaviour of the message dialog box was to appear in front of the
+main window in a modal style. The only problem was when the message box was
+initiated from another dialog window, where upon the message box would again
+correctly appear in front of the main window, but behind the initiating dialog.
+The correct behaviour is to have the message box appear in front of all the
+application's windows, and not allow interaction with any of them.
+
+Previously, the call to MessageBox() passed a handle to the main window as the
+first parameter. This didn't take into account message boxes started from other
+dialogs. The fix is to pass NULL as the window handle, and set MB_TASKMODAL as
+the modal flag, to prevent input to other windows in the current application
+without suspending other applications.
+
+		  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/23
+FIX PANE READ-ONLY BEHAVIOUR IN MFC
+
+There are differences between the Mac and MFC read-only models. Due to PowerPlant
+lacking read-only field attributes, the Mac code implements read-only state by
+the LAttachment dbClickLinkDirtier::ExecuteSelf swallowing keystrokes.
+
+We therefore need additional logic in the MFC classes to set read-only states
+where appropriate, as a property of the control (eg: call CEdit::SetReadOnly).
+
+The central point at which this can be called is dbFieldLink::PreApprovedReadOnly
+but the call is only available for CEdit classes. We can make a virtual method at
+this point in which to actually set the read-only attribute, but this would
+result in a duplicate virtual method at all the leaf ...Link2EditField classes.
+
+An adequate solution is to use the IsKindOf macro in MFC to identify CEdit
+descendants.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/24
+FIX MFC REFRESH ISSUES WITH HIER BROWSERS
+Under Windows we are getting messages to hier browsers because they
+too are listeners, unlike the Mac, to the database which is their topmost
+view.
+
+This seems reasonable but breaks some of the KIDMAP application code.
+However, it will probably fix some longstanding KIDMAP Mac bugs if
+implemented properly on both platforms.
+
+For now, we will attempt to recreate Mac bugs under Windows by making
+the dbHierBrowseHelper NOT listen to OOFILE messages.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/29
+MFC TREE CONTROL LIMITATIONS:
+SHOW MULTIPLE COLUMNS IN TREE CONTROLS
+
+The Windows common controls tree control is severely limited. Not only
+does it lack the ability to set tabstops, there is also no way to provide
+an owner-drawn behaviour for the cells of the tree. 
+
+Our options are:
+1) just insert a fixed number of spaces between columns
+  (done for now to see how it looks in KIDMAP)
+  
+2) using spaces, have a padding algorithm to at least roughly align data
+when we have widely varying data (relies mostly on a fixed-width font)
+
+3) a complete replacement of the tree control, given the lack of an
+owner-drawing feature, where we will have to implement all tree behaviour
+ourselves.
+
+98/04/30
+After discussion with Cameron at Mercator, decided simple padding algorithm
+using field widths would be better (option 2) instead of 1) for now as it is
+fairly easy and gives slightly better alignment, particularly if data varies.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/11
+COPING WITH WINDOWS COMBO BOX STYLES
+
+There is a problem with some Windows combo box styles as they lack an embedded
+edit control. Our current linking logic assumes an edit control will do the
+dirtying.
+
+The only approach I can think of at present is some kind of parallel mechanism
+where the style
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/30
+DEBUG WINDOWS FIND BY TYPING
+Elemir reports that UNavigableTable::FindOIDforData always returns true (simple
+bug). However another problem with tree controls is they still react immediately
+to the keystroke typed - there is not a mechanism to suppress this as we've added
+to lists.
+
+With lists, the keystroke reaction works fine.
+
+In lists we have one minor inconsistency with the Mac behaviour - if a match is
+not found (eg: type V when the highest item is Smith) then the Mac list scrolls
+to the end of the list. We need to add this at our subclassed control level.
+				
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/30
+HANDLE WINDOWS ACCELERATOR KEYS
+The basic Windows edit control either reacts to or blocks control keystrokes,
+emitting a beep
+if it doesn't understand them.
+
+We can provide an OnChar routine in COOFEdit which will let us intercept these
+keys, the problem then being how to tell the framework that they've been
+intercepted.
+
+Thought - can PP2MFC do it?
+
+				
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/10
+WEAKNESSES IN GUI MODEL - SIMULTANEOUS EDITS
+
+The Tiny Dialogs demo unfortunately doesn't show OOFILE in a good light - it
+creates a second modal window editing a field in parallel to that record being
+edited in the first. This is not catered for as closing the modal dialog leaves
+the record. Firstly, there is a bug here in that pressing OK should imply a save,
+it should not present the YNC dialog "do you want to save?"
+
+Secondly, we should be able to have multiple edits on the same record without any
+of them saving. However, this may better be accomplished by the shared record
+backend that Liam wrote (and which has yet to be incorporated).
+
+If we wanted multiple edits on the same record to avoid saving on exit, maybe a
+sub-editor model can be used.
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/08/09
+CRASH WHEN DON'T ENTER DATA ON WINDOWS IN NUMERIC ENTRY BOXES
+
+The problem is that dbShortLink::getValue() and similar methods assert when
+sscanf returns EOF. EOF is returned for an error or if the end of the string is
+reached before the first conversion.
+
+The Mac implementations use a different call which copes with 0.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/30
+INTERFACING POPUP MENUS IN GENERAL
+
+An entry class for a popup menu needs to combine the matching of a field which is
+the target with the list which may come from various sources.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/31
+NEW GUI INTERFACING - COUPLING TO THE GUI CONTROL
+
+The problem which finally came to the fore with adapting to the new GUI control
+classes in PowerPlant (CodeWarrior Pro 4) was the combinatorial explosion
+resulting from writing concrete dbFieldLink subclasses specialised on both the
+field type and the control type.
+
+Analysing control behaviour, and the services we require from a control, the
+responsibilities of dbFieldLink need only a very thin interface to the control,
+to get, set and compare text. Similarly the thin interface to the field could be
+implemented solely using the setString and copyString virtual functions.
+
+In practice, it is useful to subclass dbFieldLink explicitly for dbChar and
+dbText to obtain optimal string operations with those classes without having to
+generate temp copies. (Remember that an oofString on the stack still hits the
+heap to generate the body storage!)
+
+A simple way to reduce this explosion is to use the copyString virtual interface
+for the field but still subclass dbFieldLink for every control.
+
+Unfortunately, the main source of the explosion is the variety of possible
+controls for the RHS.
+
+Furthermore, the current structure assumes all controls inherit from LPane.
+
+If the link to the GUI were managed by a small family of objects following the
+Adapter then we would only need to add a new standard Adapter class when a new
+GUI appeared and, what's more useful, users could add their own Adapters for GUI
+classes tey develop.
+
+By totally shielding the GUI control with the Adapter it can be  independent of
+any base class, and indeed might not be an interface to a GUI (maybe some other
+data source, like serial port, spoken input etc.).
+
+We can keep the current easy interface where dbEditHelper::linkField is
+overloaded with a variety of field and control types, but drastically reduced to
+match the combinations of actual dbFieldLink subclasses and common Adapters for
+the RHS.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/31
+NEW GUI INTERFACING - CREATION OF DIRTY SENSOR
+
+On the Mac, a dirty sensor is used to tell when a GUI edit control has been
+changed, and implements the read-only behaviour that allows the field to stilll
+be active for selection and copying.
+
+In the old GUI, this dirty sensor was created by dbFieldLink, the base class,
+invoked by the ctor passing one of several possible control types into the
+overloaded createDirtySensor method.
+
+With the new Adapter design, the dbFieldLink is ignorant of the type of control
+on the RHS - TOTALLY!
+
+The only important consequence of this decision is that the dbGUIAdapters must at
+least at construction time be passed the relevant dbFieldLink. However, if we
+rely on this being passed in as a ctor parameter it becomes awkward for people
+writing their own Adapters.
+
+Whilst the dbFieldLink is in ignorance of WHY an Adapter needs it as a param, we
+will standardise that the dbFieldLink base class, which owns the Adapter, will
+call setFieldLink() on the Adapter.
+
+Therefore, the Adapter is responsible for creating the dirty sensor (if any). It
+is important to note that there is no guarantee that a given Adapter will
+implement this responsibility using a dirty sensor - it just has to make sure it
+calls dbFieldLink::maybeDirty() and maybeChangeField().
+
+ALTERNATIVES
+1) Continue to use the current dirty sensor objects as their functionality has
+not changed - they will just be created as appropriate inside the Adapter
+constructors.
+
+2) Make the dbGUIAdapters themselves be the sensors, where appropriate.
+
+The only argument in favour of 1) is that it enables reuse of a current object,
+but we have to move its creation and ownership.
+
+The argument for 2) is that it prevents the doubling of heap-based object
+creation. This could save some 50 or more objects being created per screen for a
+moderate GUI and doesn't add significantly to the complexity of the Adapters.
+
+DECISION - dbGUIAdapter subclasses will also function as dirty sensors.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/02
+NEW GUI INTERFACING - UPDATING DERIVED FIELDS
+
+Another dbFieldLink virtual function is updateDerivedFieldDisplay which is
+usually implemented in the parent classes like dbDateTimeLink which are
+specialised on a field type.
+
+The default behaviour of this method is to only update if the field is
+calculated.
+
+We currently override for date and dateTime fields which might have a format
+mask. This results in unnecessary refreshes - these could be redrawn on exit from
+the field, rather than in this manner. We already know when we are leaving a
+field, so adding a virtual updateLinkOnExit allows fields such as numerics which
+might have a format mask to do so. It also gives us a convenient hook in which to
+attach user updates later.
+
+Whilst the new Adapter architecture supports this specialisation, we don't need
+as many of these field-specialised classes. There are two implementation
+patterns, repeated many times. Virtual fields (that might therefore be
+calculated) are tested and numeric fields which have a format mask are
+redisplayed.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/02
+STATIC TEXT CONTROLS  AND THEIR POSITION IN THE NEW PP HIERARCHY
+Note the new LTextEditView and the existing LTextEdit can be used to display
+read-only text using the attribute, tested with HasAttribute(textAttr_Editable).
+If this is suppressed, the control is totally disabled for user interaction and
+can't even be clicked on.
+
+We have a minor conflict between wanting an oof base class (dbGUIEditor) with
+subclasses that know about LPane, vs an LPane base class that can have both
+static and editable classes below it.
+
+Given that the PP example shows that an editing control might be used to
+implement static text, it seems very useful to have this be a behaviour of an
+editable base class, rather than a separate base. Otherwise we can't cope with a
+change in this behaviour without destroying and recreating Adapters, which may
+not be feasible.
+
+The flipside is that we may incur a lot of overhead for static controls which is
+unneeded.
+
+We can't get away from the virtual functions being called as all field links are
+equally traversed when we attempt updates etc.
+
+So, the only place there is an overhead is checking if the control is read-only
+and therefore skipping processing in
+
+LTextEditView introduces the ability to set attributes later than class creation
+time, so we now have at least one example of a control which can change to and
+from static behaviour. As there is no notifican of this change into which we can
+hook, this implies that our testing of read-only state has to go all the way
+through the Adapter to the control.
+
+HOWEVER 
+
+Look at the user interaction - if a control is static or becomes static that
+stops the end user from setting its value but doesn't prevent application code
+from directly modifiying the control. I think for now we will have to live with
+that - people can directly invoke copyLinkToField (whoops, this is a reason to
+put back the linksTo method on dbFieldLink)!
+
+But, getting side-tracked apart, if a field has a dbGUIAdaptEditPane attached
+that is reacting to the pane being changed, a read-only pane just won't be
+invoking that LAttachment so not notifying the main editor that it is dirty.
+
+CONCLUSION
+There may be some minor overhead introduced in some circumstances, but making
+static text controls behave simply as read-only editors simplifies a lot of work.
+
+COROLLARY
+The new read-only attributes in LTextEditView mean that the fast isReadOnly check
+in dbFieldLink needs customising to check with the Adapter, and maybe the default
+Adapter should therefore be the place which stores this state.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/31
+HIERARCHIC BROWSERS AND RECURSIVE DATABASES
+- why do we need to know the bottom-level - is this OOFILE or outline table?
+- can we have a quick version that has fixed number of depths?
+
+The big problem with my current implementation is how tightly it is tied to
+the Mercator model, where you have a fixed number of levels and 'leaf'
+items only occur on the bottom level.
+
+(This would be like a disk being structured with folders containing folders
+until level N which is allowed to contain files).
+
+This weakness is not only for recursive databases, but the reason I've 
+linked it to them is a recursive database structure is the most likely
+way to implement an unlimited depth tree.
+
+I think the main problem is that dbHierBrowseHelper::itemIsAtBottom is the
+method which decides if an item is a leaf or not. This is used in handling
+selections and displaying the triangle (the override of
+LOutlineTable::CanExpand).
+
+If this responsibility is moved into the OutlineItem then we can have a
+different implementation for other kinds of outine (which is actually more
+generally applicable than Mercator's).
+
+I see an item as knowing whether it is a leaf or not (which is of course
+how LOutlineItem is designed) and this information coming from the database.
+
+At present we assume only one kind of dbViewOutlineItem and these are
+created in dbHierBrowseHelper::insertItemsBelow.
+
+If dbHierLevel becomes a factory for dbViewOutlineItems it can create a
+subclass if necessary, which gives us a way to hook in different behaviour.
+
+This isn't necessarily an optimal design - it would be better to design
+again from the top down to make the base classes more generic in their
+assumptions, but I don't think I have the time or the experience in
+different ways that outlines may be used. I think using this approach I can
+come up with a workable solution for your current needs and we can take
+that experience and feed it back into a redesign later.
+
+99/04/02 
+insight - dbViewOutlineItem can have mIsLeaf member set at creation in the current
+model. I've been very concerned over the problem of adding significant lookup
+logic to the current implementation as that will hit Mercator's performance.
+
+Can we make our support a mixin, so people can multiply inherit from it plus
+the other OutlineItem classes such as LEditableOutlineItem? There are no minuses
+to this, and it makes dbViewOutlineItem into an Adapter.
+
+
+DECISIONS
+- move most of the current function of dbViewOutlineItem into a mixin base
+- make the base retain leaf status for speedy lookup, breaking the assumption
+  that a leaf is only at the bottom-most level
+- make dbHierLevel a factory for the outline items
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/02
+SHOULD MAC OUTLINE ITEMS STORE INDENT LEVEL?
+
+The current Flyweight pattern for the outline items identifies the
+content by storing a level indent, which the browse helper uses to 
+lookup a level and hence a view, and an oid, which uniquely identifies
+a record in that view.
+
+This view lookup is used to get the draw contents and in matching typed
+data (in both cases for non-cached data) and gets the level by an array
+lookup in the browser helper, plus the inline function call to get the view
+from the level.
+
+Storing a pointer instead of the indent level would cost an extra 2 bytes 
+per outline item, which could run up to 10kb or more with a large list
+(remember that we at least have to create an outline item for each top-level
+item, before they are scrolled into view).
+
+ALTERNATIVES
+1) store a pointer to the dbView, going directly to that, or
+2) point to the level, from which obtaining the view is an inline.
+
+ISSUES
+1a) saves an extra inline function call at the cost of storage increase
+1b) has an added flexibility in supporting different views at the same
+    indent level. This is very appealing as a flexible model
+
+2a) Storing the level just speeds things up very slightly at the cost of
+significant storage.
+
+In both cases, if we lose the indent level then we complicate 
+dbHierBrowseHelper::insertItemsBelow as we need a new way to determine 
+the next level (replacing the simple increment of level indent).
+
+The flexibility argument in 1b has a lot of appeal, but if we move to a
+factory model where dbHierLevel subclasses make the LOutlineItems then
+a user is free to add view storage by subclassing OOF_mixOutlineItem
+if we make view() and level() virtual accessor functions in OOF_mixOutlineItem.
+
+DECISION
+- keep the indent level in the base class OOF_mixOutlineItem
+- add virtual view() and level() accessors so subclassing more flexible
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/23
+NEW GUI - USE GUI ADAPTORS IN MFC & COMPILE NEW GUI WITH VC5
+
+The existing MFC dbFieldLink subclasses assume OOFILE-oriented subclasses
+of MFC controls are used to provide notification to a dbLinkDirtier.
+
+This is because no easy analogue to the LAttachment mechanism was found
+(I didn't investigate - Elemir did, so there may still be a more generic
+solution in future).
+
+In rewriting the Windows GUI to use adapters it would be nice to uncouple 
+the dependence on the OOFILE specific editing classes. If LAttachment was made
+a mixin, with the OOFILE editing classes multiply inheriting, then users can
+do their own control subclassing in future and have this mechanism.
+
+Alternatively, we don't need to have quite the same flexible mechanism to 
+provide the immediate behaviour - just link an adapter instead of a dbLinkDirtier.
+
+DECISION - provide a mixin to centralise linking a dbGuiAdapter, because it's
+simpler but will be more flexible for users.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/23
+NEW GUI - WHAT MFC ADAPTERS NEEDED?
+
+The CWnd generic base class allows us to get and set data and there is a 
+temptation to only supply an adapter for this class.
+
+However, the adapters also provide message filtering follwing the PowerPlant
+example where the ExecuteSelf method of the dbLinkDirtier classes was 
+moved into the adapters.
+
+Looking at the OnCommand overrides for COOFEdit, COOFCheckBox etc there
+is a similar variation in message handling depending on the control type.
+
+We have the opportunity in the dbEditHelper::linkField methods to create an 
+adapter matching the control type.
+
+DECISION - use a base CWnd class for most of the adapter functionality but
+subclass so we can handle OnCommand differently for different controls.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/17
+DEBUG NEW GUI - ERRORS LEAVING FIELDS ON WINDOWS
+
+The old GUI on Windows had two lots of dbFieldLink::maybeChangeField.
+
+On the Mac we always call with the destination field because it was triggered
+by a click, or tabbing into the new field.
+
+Under Windows, we get a click coming into a new field (same as Mac) but the
+tabbing out is OnKillFocus so the dbFieldLink responding is the old link,
+passed a CWnd* for the new field.
+
+We therefore still need a mechanism to get from this CWnd* to the new dbFieldLink.
+
+Option 1)
+Bruno at Mercator suggested a dynamic cast from the CWnd to OOF_mixEditAttachment
+and adding OOF_mixEditAttachment::Adapter() to get the Adapter and hence the field link.
+
+This assumes a number of things, particularly that CWnd's connected to the database
+will be using OOF_mixEditAttachment. We do NOT force the user to do so!
+
+Option 2)
+Find a way to get to dbHelper::getLink (this step is all that
+is missing). By adding owner() to return the dbHelper for the departing link, we can get
+its owning dbEditHelper and lookup the link from there.
+
+This is a lot safer as it keeps central the ability to lookup a CWnd and get a
+dbFieldLink back.
+
+Decision - use option 2
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/07
+SUPPORT EDITING REPORTS - FIELD-BY-FIELD EDITING
+
+The UI design for the report preview window editable content feature has two 
+aspects which may affect the GUI area.
+
+1) editing is a single field at a time in a modal dialog, which has navigation buttons
+   to move to another field.
+   
+2) some of the items being edited are not fields - they are titles held in 
+   oofRepDrawable objects or column titles of views (and there may be multiple
+   values per object, like leading and trailing text in oofRepPageNoBlock). 
+
+Does this need for editing map onto dbEditHelper?
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/12
+ISSUES IN ADAPTING CHECKBOXES & OTHER CONTROLS.
+
+Under Windows, we've ended up with all adapters needing to inherit from dbGUIAdaptCWnd
+with only trivial overriden behaviour.
+
+The original GUI adapter design supposed there would be significant functional differences
+between adapting an editor and adapting a control, and that an integer get/setValue interface
+would be valuable to controls
+
+I don't think a separate control adapter works very well. Hiding behind copyString is losing
+too much type information.
+
+Options:
+1) wider interface in base Adapter, dbBoolLink uses setValue(0,1),
+  format masking available as secondary parameter (later?)
+  
+2) adapters that talk to numerics check the incoming string for T/F values before
+   trying to convert to number, in case the field is boolean.
+   
+How to decide? One aspect - other people are expected to write adapters. We should
+not set an example where special content-aware logic is required!
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/16
+HORIZONTAL SCROLLING OF MAC TREE CONTROLS 
+(CDragDropOutlineTable subclass of LOutlineTable)
+
+There are two issues
+1) initial width causing scroll bars to be enabled
+
+2) 'widening' the internal image so scrolling enabled as controls twisted open
+
+ISSUES
+- setting the internal image width
+  - calculating the image width from columns
+  - refreshing based on deepest level (presumed widest)
+  
+- respond to twist open-close (dbViewOutlineItem::ExpandSelf & CollapseSelf)
+  - refresh a 'deepest level' pointer/count
+  - calculate deepest level width
+  - trigger resize (  call mOutlineTable->AdjustImageSize)  
+  
+  
+  
+STAGED IMPLEMENTATION
+1) enlarge image by indent amount & level width each time twist open
+   (if not already larger) or closed
+
+2) only apply change if have horizontal scrollbar
+
+3) calculate initial widths in smarter manner
+
+
+RELEVANT INFO FROM INVESTIGATIONS
+LOutlineTable::MaximumIndentChanged is an override hook provided to notify us
+that the nesting depth has changed. We can just respond to this to adjust the
+width based on the indent.
+
+dbHierBrowseHelper::resetTableAfterViewRestructure sets the initial widths
+
+LOutlineItem::LOutlineItem hardcodes mIndentSize = 22; The only indent value
+configurable from the PPob resource is the first level indent (which you set to
+allow for triangle plus maybe icon).
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/07/23
+PREVENT MESSAGES ABOUT INVALID FIELDS WHEN CANCELLING RECORD
+
+Client site (Mercator) suggestion - ask people if they want to save then possibly
+tell them they can't because of some validation, which may annoy users even more.
+
+This has not yet been deployed with end users nor tested with focus groups - 
+I have profound doubts about its long-term usability but a better solution may 
+involve more refactoring of GUI control flow.
+
+I think the key problem is that LeaveRecord is being called regardless of why
+we are leaving - either it needs a state param, the object needs a state flag
+or it shouldn't be called at all.
+
+99/10/02
+On thinking more about this, and reviewing the code, the change seems more reasonable.
+The only problem is in case other users have based their logic on the broadcast messages
+occurring before the attempted save. 
+
+DECISION
+For now, implement a change in the order of asking CanSaveRecord and broadcasting
+the save message.
+
+Later:
+- revisit the whole issue, probably factoring separate messages for CanSave vs
+before and after actual saving.
+(See casual ideas in Thoughts diary)
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/10/03
+SUPPORT EDITING TABLES IN DIFFERENT SAVE MODES
+
+The current edit helper implementation has a member mAutoSaveOnMoving which
+was intended for subclasses to provide overriding of this behaviour.
+
+It is used to decide if we ask to save when leaving a record, but as is always
+false is useless.
+
+It is a trivial and straightforward modification to init this member based on
+the save mode of the table - do it.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/22
+FIX BUGS - SIZE OF FIELD NO LONGER LIMITS ENTRY
+
+Before the rewrite of the GUI to use adapters we had the size of fields set
+so dbChar field max lengths influenced the GUI
+
+On the Mac:
+
+dbCharLink2EditField::dbCharLink2EditField(dbChar* fld, LEditField* ctl, bool isReadOnly) :
+	dbCharLink(fld, ctl, isReadOnly, false /* don't disable readOnly panes */)
+{
+	createDirtySensor(ctl);
+	ctl->SetMaxChars(fld->fieldStorageLen());
+	
+	
+	
+On Windows
+dbCharLink2EditField::dbCharLink2EditField(dbChar* fld, COOFEdit* ctl, bool isReadOnly) :
+	dbCharLink(fld, ctl, isReadOnly, false /* don't disable readOnly panes */)
+{
+	createDirtySensor(ctl);
+	((CEdit*)linksTo())->SetLimitText(fld->fieldStorageLen());	// safe downcast
+}
+
+
+WIth the range of PowerPlant edit controls supported we don't always have that
+interface - LEditField and LEditText provide SetMaxChars. For now we will probably
+have to live with the assumption that you don't connect a dbChar field to a "large" 
+editing control such as an LTextEdit or LTextEditView.
+
+	
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/04
+ENTERING RELATED DATA
+(see long discussion in OOFILE_GUI_Thoughts.txt)
+
+FORCES
+F1) want to preserve trivial dbEditHelper::linkField syntax to just do
+    the right thing wherever possible, including popup menus of lookup
+    tables.
+
+F2) want a simple way for entry of a related key to trigger finding a related record
+
+F3) should still support popup menus being used to enter an integer value.
+
+F4) sensible default params should be used to choose behaviour - the same
+    syntax should yield the same result regardless of control type. So entering
+    or selecting a related record from a popup should be similar to entering
+    a key field to choose the record.
+    
+
+
+ALTERNATIVES
+1) Linking an entry control to related fields is always about selecting a record. If we want 
+   to actually edit the related data, it's linked to a dbEditHelper on the related table.
+  	ie, using the dbEditHelper on Patients, linkField to Patients->Doctor->Name is a selection.
+  	using the dbEditHelper on Patients->Visits, linkField to Patients->Visits->Date is entry.
+  	
+2) linkField always allows for entry, use a different call linkPick to have
+   selection.
+   
+
+DISCUSSION
+Option 1) can be accomplished transparently now and allows for incremental extension 
+of new dbEditHelpers that manage special issues to do with related editing.
+
+Option 2) seems more direct and doesn't hide that different behaviour may occur.
+
+The specification of related data in 1) is one indication of a difference but it
+may not be clear in context.
+
+We already have linkField behaviour for popup menus, entering simple integer values.
+
+DECISION - 2) as there is too much chance of confusion in 1). 
+
+
+MULTIPLE LEVEL RELATIONSHIP LOOKUP
+Given a multiple level relationship Patients->Visits->Doctor->Name, how do we know
+at which level we are editing and which is just the navigation to the selector?
+
+ALTERNATIVES:
+1) assume only the last relationship is to the selector, in this example we
+   are entering Patients->Visitor, choosing the related Doctor for that Visit.
+   
+2) Require explicit specification, something like:
+   mHelper->linkPick(Patients->Visits->Doctor, Patients->Visits->Doctor->Name, pop2)
+   
+DISCUSSION
+Option 2) is unambigous but ugly. It also represents a highly unusual situation so can
+handle with default args to 1).
+
+DECISION - option 1) with optional param to specify point on the relationship chain
+other than the last-but-one table being the entry field.   
+
+
+dbFieldLink REFLECTIVE INTERFACES
+One of the biggest differences, and most likely to cause subtle bugs is
+that dbFieldPickLink separates the target field (the dbRelRefBase) being
+set by user interaction from the field which provides data entry
+characteristics, eg: a dbChar providing menu titles.
+
+The dbGUIAdapter queries field() to get entry characteristics.
+
+Previous user code has used field() to get the target. However, the context is such
+that it would be the displayed lookup value anyway.
+
+DECISION - pass the related lookup field to the parent dbFieldLink which implements
+storage and access to the target field.
+
