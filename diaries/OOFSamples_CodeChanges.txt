@@ -1,0 +1,801 @@
+Started separate samples code change diary to ease tracking
+changes.
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/20
+REPORT WRAPPED NOTES FIELDS - SampleReports project
+
+CLASS	dbStudents
+Method	AddSampleData
+		- added a couple of large notes 
+		
+		
+CLASS	CSampleBase
+- removed old enums kListReport etc. no longer used
+
+Method	ctor
+		- add description and name entries for Student Notes
+		- increment mNumReports init to 7
+		
+Method	DoStudentNotes
+		- added
+		
+Method	makeReport
+		- added case 6 to call DoStudentNotes
+
+Method	initialiseReports
+		- setup some default page headers and footers
+		
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/21
+TESTING ALL SAMPLES BUILD
+
+FILE	ooftst44.*
+- change return type of countDirs::enterDir from void to bool
+  to match OOFILE change.
+  
+  
+FILE 	ooftst46.h, .cpp
+- added new sample
+  		
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/01/14-16
+FIX HEAVY RESOURCE CONSUMPTION WITH GRAPHS IN WIN95
+(expand SampleReports to show more graphs)
+
+CLASS	CSampleBase
+Method	ctor
+		- add description and name entries for Just Graphs, Many Graphs
+		- increment mNumReports init to 9
+		
+Method	DoJustGraphs
+		- added
+		
+Method	DoManyGraphs
+		- added
+		
+Method	makeReport
+		- added case 7 to call DoJustGraphs
+		- added case 8 to call DoManyGraphs
+
+Method	DoStudentReportWithLegend
+		- add Legend into sort order so sorted by 2 fields
+		
+Method	InitialiseReports
+		- init default legendOffset(20)		
+								
+		
+		  
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/02/11
+FIX WINDOWS GLOBAL PAGE FOOTERS/HEADERS APPEARING MULTIPLE TIMES
+("Sample Reports")
+
+CLASS	CSampleBase
+Method	InitialiseReports
+		- only set global page headers & footers if not already set
+		  as this method is called every time the report dialog
+		  is redisplayed, which is possible in Windows sample.
+		
+		  
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/14
+ADD TEST CASE FOR CUSTOM DRAWER IN "Sample Reports"
+
+CLASS	CSampleBase
+Method	ctor
+		- add description and name entries for Notes with Custom Draw
+		- increment mNumReports init to 10
+		
+Method	DoNotesWithCustomDraw
+		- added to create renderer
+		
+Method	makeReport
+		- added case 9 to call DoNotesWithCustomDraw
+
+
+CLASS	SampleCustomDraw
+- added Mac-only sample
+
+
+CLASS	CDrawBigChars
+- added to file CSampleBase.cpp to demonstrate custom view drawing
+
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/15
+FIX CRASH IF TRY TO PRINT LAST REPORT IN "Sample Reports"
+
+CLASS	CSampleReports
+Method	Print
+		- subtract 1 from menu number to get 0-based report index
+		
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/02
+TEST OWNED FIELDS IN "Sample Reports" AND CUSTOM DRAWING ON WIN
+
+CLASS	CDrawBigCharsDE
+- added to file CSampleBase.cpp to draw for Windows
+
+
+CLASS	CSampleBase
+Method	DoStudentListReport
+		- add "fixed text" to main view band to test the view having
+		  an owned oofChar standalone field.
+		- use multiReport with one section to test mutation into a single report
+				  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/04
+OPENING REPORTS IN "Sample Reports" PREVIEW WINDOW & READING FROM XML
+
+FILE	Complete_CommonHeaders.h	
+		- added #define OOF_READ_REPORTS
+
+FILE	Complete_DebugHeaders.h	
+		- added #define OOF_Debug
+		
+
+CLASS	ReportData
+- all dbTable members changed to pointers
+		
+Method	ctor
+		- create new tables
+		
+
+CLASS	CSampleBase
+Method	DoStudentReport
+		- loop for all students, not just first
+		- take student name out of header
+		- previous body becomes a nested table as a break for each student
+		  so we now test output of nested tables
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/17
+FIX CRASH IN "Sample Reports" CUSTOM DRAWING
+
+CLASS	CDrawBigChars
+Method	calcNextDrawHeight
+		- cope with having drawn all our content and still being called
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/19
+IMPROVE DRAWING CUSTOM SAMPLE IN "Sample Reports" UNDER WINDOWS
+
+CLASS	CDrawBigChars
+Method	draw
+		- don't update mDrawFromChar
+		- add comment explaining limits on draw()
+		- fix silly bug where iterated from mDrawFromChar
+		  instead of iterate from 0 and add mDrawFromChar
+		
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/19
+AVOID LEAK REPORTS WITH "Sample Reports"
+
+CLASS	ReportData
+Method	ctor
+		- init theDB(false) so the RAM backend doesn't think it is
+		  temporary and so deletes its tables
+		  		
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/26
+TEST ZERO-WIDTH COLUMNS WITH "Sample Reports"
+
+CLASS	CSampleBase
+Method	DoStudentListReport
+		- set the width of the 'fixed text' column to 0
+		  so we can see that it doesn't cause crashes but the
+		  data is still exported OK.
+		  COMMENTED OUT - it fails and I'm not going to fix it right now!
+			  		
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/26
+TEST WRITING COLUMN DETAILS WITH "Sample Reports"
+	  
+CLASS	dbStudents, dbTeachers
+- put spaces in the descriptive field names LastName, FirstName
+
+
+CLASS	CSampleBase
+Method	DoPerformanceOnCurricItems
+		- set headings on the nested table
+		
+			  		
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/29
+ADD CUSTOM CODE SERIALIZATION TO "Sample Reports"
+
+CLASS	CDrawBigChars
+added methods
+- signature
+- serialize
+- registerSerializable
+- makeAdorner
+
+
+CLASS	CSampleBase
+Method	InitialiseReports
+		- call CDrawBigChars::registerSerializable()
+
+
+FILE	CSampleBase
+- add #include "oofrpXML.h" & #include "oofriXML.h"
+
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/01
+DEBUG PROBLEMS WITH COLOUR AND CUSTOM DRAWERS ON WINDOWS
+
+CLASS	CDrawBigChars
+Method	draw
+		- use oofWinTextStyleDE::safeChangeStyle to change styles\
+		  instead of the environment, because if save to file you
+		  destroy the GUI preview environment
+		  
+
+CLASS	CSampleBase
+Method	DoNotesWithCustomDraw
+		- specify a color for the custom style
+		
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/01
+READ & WRITE OVERLAY DATA OUT FROM GRAPHS
+
+CLASS	ReportData
+Method	populateTempProgressData			
+		- return an average
+		
+CSampleBase::DoJustGraphs
+		- add an overlay of the averages of achieved levels on
+		  the stacked bar		
+		- copy the stacked bar and do one with the last two 
+		  series overlaid
+		  
+		  
+FILE	database.cpp
+- define constant kMaxLevel=5
+		  
+use kMaxLevel instead of 5 in:
+- dbProgress::AddRecord
+- dbCurricItems::AddRecord
+- dbProgress::AddSampleData
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+99/05/31 - 06/04
+FIX BACKEND-SPECIFIC FILENAME CLASHES IN CONSOLE TESTS 
+
+FILE	ooftst18
+added code 
+within #ifdef RAM_TEST
+so that if a file name ooftest01:ooftesto1 exist and the dummy open 
+testdata is called then addtestdata() is invoked so we get a full database
+
+
+FILE	ooftst10.cpp
+Changed 
+	#ifdef TESTING_DBASE
+		#ifdef _Macintosh
+			const char* kExistsName =  ":ooftst10:Patients.dbf";
+TO
+	#ifdef TESTING_DBASE
+		#ifdef _Macintosh
+			const char* kExistsName =  ":ooftst10:People.dbf";
+so that test harness could reconnect
+
+
+FILE 	ooftst16.cpp
+changed 
+#ifdef _Macintosh
+			const char* kExistsName =  ":ooftst16:Patients.dbf";
+			const char* kDatabaseName = ":ooftst16:";
+	
+#ifdef _Macintosh
+			const char* kExistsName =  ":ooftst16:dbPatients.dbf";
+			const char* kDatabaseName = ":ooftst16:";
+so that test harness could reconnect
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/08
+BACKING STORE FOR MODIFIYING REPORTS
+
+FILE	ooftst01.h
+- correct my marital status in the sample note data
+
+
+FILE	ooftst47.cpp
+- added like ooftst01.cpp to test the new bufferForever mode
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/07/04
+TEST lastModified
+
+FILE	ooftst46.h
+CLASS	dbDirTree
+- add LastModified dbDate field
+
+Method	Add
+		- change to oofFileRef& param
+		- set LastModified
+
+Method	AddRoot
+		- set LastModified=0
+		
+
+CLASS	DirTreeBuilder
+Method	visit, enterDir
+		- pass the oofFileRef to Add rather than just a name
+		
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/07/11
+ADD TEST CASE FOR STANDALONE FIELD IN "Sample Reports"
+
+CLASS	CSampleBase
+Method	ctor
+		- add description and name entries for Single Note
+		- increment mNumReports init to 11
+		
+Method	DoSingleNote
+		- added to create trivial reportx
+		
+Method	makeReport
+		- added case 10 to call DoSingleNote
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/07/13
+BUG WITH WRITING REPORTS WITH CENTRED BLOCKS
+
+CLASS	CSampleBase
+Method	DoStudentReport
+		- change from a block with centred text style to a text
+		  style on the layout band and centred block using the 
+		  align() method on the block.
+		  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/21
+COMPILE CONSOLE SAMPLE ON MAC
+
+
+FILE	textConsole.h
+- remove #include "CSampleReports.h"
+- add forward decl of CSampleBase
+
+FILE	textConsole.cpp
+- remove	#include "oofRepPPWindow.h"
+- remove #include "oofRepPreviewPP.h"
+- remove #include "CSampleReports.h"
+- add #include "CSampleBase.h"
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/11/21
+ADD TESTS FOR REPORT EDITING
+
+
+FILE	CSampleBase.cpp
+- add #include "oofrepedit.h"
+
+
+CLASS	CSampleBase
+Method	InitialiseReports
+		- set global report editor 
+		
+		
+PROJ	SampleReports.mcp (Mac sample)
+- add OOFILE files oofrepedit.cpp, oofRepEditMac.cpp
+- add Appearance files ( to support sample edit dialog ONLY)
+  - CustomTextColorCDEF.rsrc
+  - whole Appearance control subdir from _Appearance Classes
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/09
+SEPARATE OUT DEMO CELL EDITOR SO USERS NOT FORCED TO LINK LGADIALOG ETC.
+
+FILE	CSampleRepEdit.cpp
+- added to project
+
+FILE	CSampleRep.PPob
+- added CellEditor and accompanying Text Trait PPobs
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/15
+TRIGGERING PAGE REFLOWS AFTER EDITING
+
+CLASS	CRepEditDialog
+Method	ListenToMessage
+		- added OK & Cancel cases
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/20
+WRAP RTF CHARACTERS THAT WOULD CAUSE ILLEGAL RTF IN REPORTS
+
+CLASS	dbStudents
+Method	AddSampleData
+		- add some characters in notes that would otherwise crash RTF
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/20
+MAKE EDITING SAMPLE SHOW MAC NOTES CORRECTLY IN REPORTS
+
+CLASS	CRepEditDialog
+Method	LoadCellEditField
+		- add call to lineEndingsMac
+		
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/21
+CHANGE REPORT EDITING TO REUSE GUI LINK CLASSES
+
+CLASS	CRepEditDialog
+Method	FinishCreateSelf
+		- change param to InitEditControls to create a dbGUIAdaptLTextEditView
+		
+Method	AttemptSaveCellEditField
+		- check and only save if dirty
+
+Method	ListenToMessage
+		- add test of mAnyContentDirtied to determine if refresh when exit		
+		
+FILE	CSampleRepEdit.cpp
+- add #include "oofpp.h"
+		
+		
+PROJ	SampleReports.mcp
+- added oofgui.cpp
+- added oofpp.cpp
+- added oofppyn.cpp & oofync.ppob
+- added oofpplk.cpp
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/23
+PREVENT EDITING CALCULATED FIELDS IN REPORT CELL EDITOR
+
+CLASS	CRepEditDialog
+Method	LoadCellEditField
+		- pass bool into getCellText and set readonly state of adapter to match
+		
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/23
+UPDATE LOCATION DISPLAYS IN REPORT CELL EDITOR
+		
+CLASS	CRepEditDialog
+Method	LoadCellEditField
+		- pass string into getCellText and set caption 
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/12/23
+WINDOWS BUILD OF REPORT EDITING
+
+PROJ	Sample Reports
+- add include dir \oofile\source\gui
+- add library OOFMFCLibSD
+- add file oofrepeditWin.cpp
+- add file CSampleRepEdit.cpp
+- add definition OOFMFC_STATIC
+
+
+FILE	CSampleRepEdit.cpp, .h
+- wrote to contain sample editing dialog
+
+FILE	Sample Reports.rc
+- IDD_CellEditor DIALOG added
+
+
+FILE	resource.h
+- definitions added for IDD_CellEditor
+
+
+CLASS	CCellEditor
+- renamed to CRepEditDialog to match Mac sample
+
+Method	 UpdateLocationDisplay
+		- added
+	
+Method	LoadCellEditField
+		- added
+		
+Method	AttemptSaveCellEditField
+		- added
+
+Method	CreateEditDialog
+		- added static factory
+		
+MEthod	OnInitDialog
+		- added to init editing control
+						
+
+FILE	CSampleRepEdit.h
+- add #include "resource.h"
+	
+
+FILE	CSampleRepEdit.cpp
+- add #include "oofrepeditx.h"
+- add #include "oofmfc.h"
+- add #include "oofmfcct.h"
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/10
+EDITING JOIN KEYS AND OTHER FIELDS
+
+CLASS	CSampleBase
+Method	DoPerformanceOnCurricItems
+		- call setFieldNonEditable to protect join key
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/12
+FIX CRASH IN MAC SAMPLE REPORT WHEN QUIT WITH PREVIEW WINDOW VISIBLE
+
+CLASS	~CSampleReports
+Method	dtor
+		- replicate some LCommander logic to delete sub commanders 
+		  BEFORE deleting database
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/12
+FINISH WINDOWS REPORT EDITING DIALOG
+
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/12
+CONFIRM REPORTS OK WITH EDITING DISABLED
+
+CLASS	CSampleBase
+Method	DoJustGraphs
+		DoStudentReportWithLegend
+		- disable editing using the report settings to remove the editor   
+		  (for this report alone)
+		
+
+Method	DoStudentReportWithLegend	
+		- remove bandIndenting setting to contrast with DoStudentReport
+
+Method	DoStudentReport	
+		- reduce bandIndenting setting as squishes graphs
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/12
+FINE-TUNE EDITING BEHAVIOUR AND DEFAULTS
+
+CLASS	CRepEditDialog
+Method	AttemptSaveCellEditField
+		- removed unneeded override
+		
+(see OOFILE_Code_Change_Diary.txt for change to avoid errors when save large 
+items back to dbChar fields)
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/03/21
+HTML ENCODE DECODE METHODS IN OOFSTR TO HANDLE CHARS>128
+
+FILE	ooftst61.cpp
+- added to provide formal testbed for the encode/decode
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/01
+INTEGRATE DAVID'S LATEST CARBONISED AND ENHANCED
+
+FILE	ooftst07.h
+Func	dotest07
+		- add extra data for other cases
+		
+		
+FILE	ooftst12.cpp
+Func	main
+		- add extra compound case for salary & Lastname search that swaps order
+		  of clauses
+		  
+FILE	ooftst24.cpp
+Func	main				  		
+		- fix bad name for dBase test.
+
+
+FILE	ooftst30.cpp
+Func	main				  		
+		- change oofBool fourth to take "N" instead of 'N' when using ANSI compiler
+		  that has "bool" data type. unfortunately chars are treated as integers so
+		  non-zero values are interpreted as true.
+
+
+FILE	ooftst30.cpp
+Func	main				  		
+		- add a Patients.selectAll() so we can confirm the changes were saved
+
+
+FILE	ooftst44.cpp
+Func	main
+		- create temporary oofDirectoryList rather than inline to avoid warnings
+		
+CLASS	countDirs
+		- updated to new oofDirectoryVisitor interface which takes 2nd param		
+
+
+FILE	ooftst46.cpp
+Func	main
+		- use local DirTreeBuilder instead of temp so don't get warning
+		  about non const ref to temporary.
+		- reverse order of #if __profile__ && defined(__MWERKS__)
+		  so compiles on non MWERKS platforms 
+
+
+FILE	ooftst47.cpp
+Func	main
+		- add sort after updating buffer to see if sorted values include buffer
+		- add extra selects to see effect of all recs and empty set on cache
+		
+		
+IGNORED CHANGES
+FILE	ooftst31.cpp
+- lot of changes using dbText instead of dbBLOB, ignored because this test IS
+  supposed to be testing a blob field!
+
+
+
+FILE	ooftst44.cpp
+Func	main
+		- downcast the temporary countDirs directory visitor, ignored because 
+		  don't understand why David thought necessary
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/13
+INTEGRATE DAVID'S RECONCILED TESTS (MANY DUPLICATES OF EXISTING)
+
+FILE	ooftst055.h 
+		- Changed to ooftst55.h
+	
+FILE	ooftst055.cpp
+		- changed ":ooftst048:Patients.dbf"
+		to ":ooftst55:Patients.dbf"
+		-changed 		const char* kExistsName =  ":ooftst055:People.dat";
+						const char* kDatabaseName = ":ooftst055:";
+		to				const char* kExistsName =  ":ooftst55:People.dat";
+						const char* kDatabaseName = ":ooftst55:";
+
+
+
+FILE	 ooftst048.h
+		 - Changed to ooftst48.h
+		
+FILE	ooftst48.cpp	
+		-changed	#include "ooftst048.h"
+		to 			#include "ooftst48.h"
+		- changed all ooftst048 to ooftst48
+
+FILE 	ooftst58.cpp
+		- chamged #include "ooftst058.h"
+		to ooftst58.h
+		- changed all ooftst055 to ooftst58
+
+FILE 	ooftst058.h
+		-changed to ooftst58.h
+
+FILE 	ooftst059.h
+		ooftst059.cpp
+		-changed to ooftst59.h, ooftst059.cpp
+		ooftest 59 was a version of fifty eigth used for debugging a bug 
+		so will remive from set	
+		
+FILE	ooftst60.cpp
+		- changed / OOFTEST7
+		to // OOFTEST60
+
+FILE	ooftst65.cpp
+		- put //******YOU MUST set the following two lines to match your server *****
+		into pragma message("")
+ 
+FILE	ooftest80.cpp
+		- changed // OOFTEST20
+		to // OOFTEST80
+
+ 
+**** ANDY NOTES *****
+FILE	ooftst48.cpp
+		- renamed my test with clashing number to ooftst52
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/13
+FIX M:N RELATIONSHIP ISSUES
+
+FILE	ooftst53.cpp, .h
+		- added to test MN relationships with pointers
+
+FILE	ooftst54.cpp, .h
+		- added variant of ooftst53 showing bugs in adding nested related
+		  1:N data inside cached M:N related
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/19
+TEST CONSOLE-ONLY REPORTS
+
+PROJ	SampleReports.mcp
+		- remove report editing files from Console target
+		- use reportsConsolePrefix.h to #define OOF_REP_NO_GUI & OOF_READ_REPORTS
+		
+FILE	reportsConsolePrefix.h
+		- added minimal prefix defining setup needed to run console mode
+
+
+CLASS	CSampleBase
+Method	InitialiseReports
+		- wrap the call to enable editing oofRep::defaultSettings()->reportEditor
+		inside	#ifndef OOF_REP_NO_GUI
+		
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/23
+FINISH BUILDING WITH PRO6
+
+CLASS	CSampleRepApp
+Method	ctor
+		- remove obsolete RegisterAllPPClasses()
+		- add RegisterClass_(PP_PowerPlant::LStdPopupMenu);
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/02/06,14
+FIX BUG IN OOFSTRING IF REPLACE  STRING WITH ITSELF & IMPROVE PERFORMANCE
+
+FILE	ooftst43.cpp
+- add more test cases for oofString::replaceString
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2002/01/06
+DEMONSTRATE USE OF CALCULATORS TO PROVIDE CONDITIONAL INDEXING
+
+FILE	ooftst69.cpp
+- added new test with calculator and NoNulls index
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2002/01/07
+FIX CRASH WITH TEST 1 ON PC
+
+FILE	ooftst01.cpp
+- correct the #defined names which caused it to create a database
+  directory called people.dat and hence crash when run again
+  
+  
+

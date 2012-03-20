@@ -1,0 +1,1794 @@
+OOFILE thoughts 94/09/13
+
+BACKEND LOGIC LOCALITY
+Should backend-specific logic be kept at the dbTable and go no lower or do we need dbFields that also have a backend? Further consideration below, on the schema and data loading issues, makes me think it would be too limiting to have all the knowledge in the dbTable. Using dbField backends allows the user to develop suitable subclasses if necessary and embed a lot of logic. If I go for a dbTable backend only, there will be a lot of meta-knowledge stored in the table backend - it ends up seeming messy.
+
+COPYING TABLES:
+when a table is created from another table, how do we copy the dictionary of fields? either fields are reference counted and we shallow copy, or we need some other mechanism. It is possible for a table to be created, copied and destroyed and so we can't blindly "own" the fields by the first table.
+
+For now, may be enough to use a coarse solution where all the fields in the dictionary are copied (deep clone of dict) when a dbTable is copied to create another context.
+
+94/09/14 ANSWER realised that I just need to implement reference counting for the dictionary object, and I can pass references to the dictionary. This is actually a lot simpler as I don't have to implement a deep copy for the dictionary!
+
+
+LOADING DATA:
+Each dbField subclass needs some mapping back to a record buffer. This has to be intimately linked with the dbTable as different backends may have radically different means of processing record buffers (eg: SQL may cover several dbTables.).
+
+
+BUILDING SCHEMA:
+The issue here, for different backends, is compiling the definition. This is definitely the job of the table_backend class but there is a major design decision to make in how the field info is converted.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/09/18
+RTTI AND FIELD TYPES
+I think there are a number of issues here.
+I have instituted enums to allow reflective type enquiries within the database, so fields can return their type.
+
+I also need something to be decided as to who has the generation logic.
+
+Factors:
+- some ops will map to the equivalent of Apply to Selection depending on the backend, this implies the op, although field-oriented, is a table responsibility
+- the user may need to override some fields depending on the backend so requires type-specialized backend fields - messy?
+- fields must know the table for those where Apply to Sel is implemented by a field level iteration, or can that be handled by delegation to a field function by a table iterator?
+- most field retrievals need to get at the table anyway to load the record
+- some vague concept from the past of loading the current record and thus each field in turn refers back to the table to make sure the record matches.
+
+Clarification of responsibilities between backend and frontend db classes:
+- although we are not doing so at present, the framework should not prevent the backend from being changed dynamically. This means that a dbTable and its parts should contain enough information to rebuild the schema.
+
+- this implies a field dictionary owned by the dbTable object. However, in many cases, the backend implementations will need a reference to this dictionary for their own purposes (eg: building schemas, or iterating through fields when streaming an entire record to cout).
+
+- there is no assumption on the part of the dbTable that the field dictionary is mimicked by the backend. 
+
+
+94/09/30
+Modelling relations.
+Think maybe use a public field, otherwise how do you tell multiple relations with the same target to use the same file?
+
+OR
+
+Because Owner->Part have implied that Part contains copy of Owner OID. In this case how do I model Parts with sub-parts. Parts won't normally have an OID field, so create one?
+
+See beta 3 for alternative syntaxes for initializing relationships - leave it up to the beta crew to decide.
+
+94/10/08
+More thoughts from the NeoAccess demo - should I be segmenting my code? Certainly there will be some users who will not require the relational aspects, and lookup table fields are another likely candidate.
+
+94/10/13
+Getting & Setting data - use operator() defined for each field type to enable the field data members to act as functions. This implies returning a reference (for LHS in setting) and thus that the backend guarantees to return a pointer to an immutable buffer portion. Whether the buffer is part of a single record buffer or is an individual field buffer is the backend's issue and NOT the concern of the field object.
+
+94/10/14
+Backends
+- need c-tree version that uses individual files as well as just Superfile, if I am going to make this usable to integrate Great Plains with other products, eg: 4D Open.
+
+Queries
+eg:
+dbPeople SalesTargets = People.Age>35 && 
+                                      (People.Income > 50000 || People.Retired);
+
+My initial thoughts were that the subclauses in each of these would be a db collection and the operators are then used to combine bitmaps or collections.
+
+Now wondering about delaying the query. This is THE issue in writing queries for 4D and SQL backends - the query needs to be atomic rather than a collection of sets being combined in the client.
+
+Had a brief brainwave - how about the subclauses of a query expression return an dbQueryClause. This doesn't need to be evaluated immediately. There may even be some advantage in allowing the user to save query definitions - this could be immediately useful in lgaplace!
+
+A dbQueryClause is directly equivalent to a boolean clause in a basic C statement. It is created as either:
+	dbTable		relationalOp			c++ clause
+	dbQueryClause	combinatorialOp		dbQueryClause
+
+=---------------------->
+LATER NOTE, the above is WRONG!!!!!!! it is really
+       dbTable.dbField     relOp        ...
+ie
+       dbField                 relOp        ...
+
+This mistake led me down the wrong path for some time - see SEARCHING REALITIES in Design Decisions
+
+<---------------------=
+
+There is a cast operator defined for dbQueryClause to convert it to a dbTable. 
+NO - this is not a cast. Use a constructor of the form
+dbTable(dbQueryClause&);
+
+***** This is the point of evaluation of the query. This allows the query to be bundled for a 4D or SQL backend.
+
+There is also the chance of combining tables from across connections, in fact catering for this will be easily than banning it! (This would have to be a runtime error.)
+
+So the logic looks something like:
+
+in dbTable constructor taking a dbQueryClause
+if single clause
+	pass to table for evaluation of simple search
+	return table
+else
+	if all clauses same connection  
+		// implies each combinatorial pair has "multi connect flag"
+		if connection is "atomic query"
+			build an atomic query
+			send atomic query to backend
+			return table
+		else
+			for each table
+				send query to  backend
+				combine the tables
+			return combined table
+	else
+		recurse this process down to groups in same connection
+		combine the tables
+		return combined table
+
+PROBLEM
+To implement this, can I have an operator == which returns other than a boolean?
+Yes of course!!!!!
+
+QUESTIONS:
+- can I have a dbTable cast oper work to return to a dbTable subclass?
+NO
+Need separate constructor dbUserTable(dbQueryClause&)
+hence decision to use a macro to define classes - see Design Decisions.
+
+94/10/15
+
+
+So, in either case getting the buffer map of the fields requires some intelligence. Note that we are just talking about the offsets within a record buffer read from c-tree. 
+
+QUERIES
+Is there any point having query clauses on related files where there is no navigation relationship between the two files?
+
+Is there any way the equivalent of a join can be performed?
+
+How about having a "temporary join field" declared as part of the query?
+
+
+94/10/18 RELATIONSHIPS & SIMPLIFYING DECLARATIONS
+With associations, have field in the table used to do the query, OR create association on the fly
+
+With in-table reference
+
+People.WorksFor  // specified associated to Companies
+People.WorksFor=="A.D. Software";  
+// requires some conversion function
+
+People.WorksFor.Name=="ADS";
+// requires WorksFor is a known table at compile time ie
+dbPeople : public dbTable {
+...
+	dbCompanies&	WorksFor;
+};
+
+
+Lets assume a complex example where people have an employment history, this gives us a part and an association relationship.
+
+class dbPeople;
+class dbJob;
+
+class dbCompany : public dbTable {
+	dbPeople*		CEO;                     // 1-1 association
+	dbChar		CompanyName,  MainBusiness;
+	dbInt			NumEmployees;
+	dbCompany*	MainOpposition;    // 1-n association
+	dbJob*		Staff;                   // 1-n part
+};
+
+
+dbJob : public dbTable {
+	dbDate		From, To;
+	dbLong		Salary;
+	dbChar		Role;
+	dbCompany*	Company;		// 1-1 association relationship
+};
+
+
+class dbPeople : public dbTable {
+	dbChar		LastName, OtherNames;
+	dbJob*		PrevJobs;	               // part 1-N relationship
+	dbJob*		CurrentEmployer;   // 1-1
+};
+
+
+
+we should be able to write queries like
+
+dbPeople softPeople = People.PrevJobs->Company->MainBusiness=="Software";
+
+or for the current softPeople record, print the number of large companies
+cout << softPeople.LastName() << "\t" << (softPeople().PrevJobs->Company->NumEmployees>100).Count()
+
+
+// print companies and CEO's where the CEO worked for the opposition
+dbCompany cp = Companies.CEO->PrevJobs.Company.MatchesAny(Companies.MainOpposition());
+cp.start();
+while (cp.more()) {
+	cout << cp.CompanyName() << "\t" << cp.CEO->Name();
+	cp.next();
+}
+
+
+IMPLICATION
+That a single record of a collection is also a collection of one!!!!!!!!!!
+
+
+
+KINDS OF RELATIONSHIP
+Joined explicitly over a field at each end.
+Stored links:  1-1
+Owner-Part over a field.
+Owner-Part with implicit join over the OID fields.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/11/14
+ISSUES IN GUI INTEGRATION
+
+PHILOSOPHY
+Simple and inoffensive!
+We want to be as least intrusive as possible into the idioms of the framework, but add functionality used in constructing common business applications.
+
+Accordingly, it makes more sense to have a group of "helper" classes and an integration guide that is specfied for each framework, rather than trying to make the framework conform to us.
+
+WHO MANAGES WHAT?
+THINGS TO MANAGE
+- database interactions - open/close, query, report
+- record editing, with possible multiple pages of editor windows
+- meta-database level, combining databases, multiple-database reporting
+
+IGNORED FOR NOW
+- the multiple database issue, how c-tree connections work for more than one and if InitISAM is global across connections or not.
+
+DEPENDENCIES TO AVOID and SAMPLE CASES
+- how individual pages of a multi-page editing system are managed
+   - single window with changing contents
+   - multiple windows
+      - only one exists at a time
+      - only one visible at a time
+      - any portion of the set visible together
+
+- path into an edit form
+      - from a list screen showing a selection of records
+      - directly as a result of a Search or New command
+      - by association with another form
+         - nested modally
+         - as a related peer
+
+
+
+HOW LGAPLACES WORKS RIGHT NOW
+This is the minimal user interface skeleton created primarily by generation from zApp Factory with a small amount of additional code.
+
+- database management is under the WPlList class (zMDIChildFrame). It owns the 
+   menus for record navigation, New records & going to pPace pages dialogs.
+
+- going to a page is currently a matter of creating a dialog. To save resources,    
+   the current dialog is closed before the next one is created.
+
+- individual dialogs have no knowledge of their peers or parent. The only 
+   reference to the parent is to forward the message from clicking one of the 
+   page selection buttons to the parent as a menu message.
+
+- dialog objects contain a set of suitable public members for storing their edit control results. Using the inherited endOK(), which calls storeData(), will simply copy those edit controls into the public members.
+
+
+SIMPLISTIC APPROACH
+- the WPlList continues to manage the database, and contains the connection and all dbTable subclasses as members. WPlList multiply inherits from dbEditMgr, needing to overload:
+   - SaveRecord
+   - TickPageMenu
+
+- dbEditMgr handles
+   - moving between pages vs OK-ing final screen
+   - updating the database (via overridden method)
+   - ticking and unticking of a page menu (if override TickPageMenu)
+   - movement between records  
+
+- each editing dialog takes a dbTable reference as an added parameter to its constructor
+
+- each zApp editing field class is subclassed to create a version which knows a dbField and has a storeData() which uses assignment to store directly into the field, and on creation uses assignment to retrieve the value from the field. This lets us use the default storeData() on the form, so there's little work there, and actually cut down on the complexity of the objects in the dialog - no need for the public variables.
+
+- endOK is added for each editing dialog to call zFormDialog::endOK() and then send a message to the dbEditMgr to say leaving the dialog.
+
+IDEAS
+prefer separate EditMgr class which WPlList can multiply inherit from and to which endOK sends a message. This gives us scope for the future. In WPlList, can set a variable when moving between pages (part of EditMgr) rather so knows if a message from endOK means OK clicked or we forced a page move from outside the dialog. Can also use EditMgr->movePages (or whatever) to tick/untick the pages menu.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/11/29
+THOUGHTS FROM LOOMIS' Object Databases The Essentials
+
+p100 - collection types
+I don't think it's worth bothering about differentiating lists, sets & arrays but I can see a possible need for a Bag type, although most examples degenerate into having SOME context sensitive info.
+eg: a set of line items - even if they are the same part and quantities will still be independent objects, thus have different OIDs and so they are not duplicates!
+
+However, look at the example on p81:
+Part_Geometry
+	numLines
+	partID
+	polyLines
+
+PolyLine
+	numPOints
+	points
+
+Point
+	x
+	y
+	z
+
+thus a Part_Geometry contains a list of PolyLines and a PolyLine contains a list of Points. This is ordered but includes duplicates?
+
+Looking at this example makes me think that Part relationships should allow some encapsulation - the lists of Points at least in the above could be wholly contained within a blob. The only reason for exposing part classes is for searching via indexes. Possibly indexing of these objects can be performed in the same way as indexing keywords.
+
+
+INSIGHT
+When I relate tables, the related one has a copy of the table and a flag saying what form it is related in. It is NOT the primary representation of that table, ie: it is OK for another thread to be processing that table with its own context. Thus, the resetBLOBs needs to become resetRefs as it should also invalidate the buffers in related tables.
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/11/29-30
+Segmentation
+
+From discussions with Bob Heller, it seems possible to have very simple
+declarations of compound fields: SortName << LastName.Upper(0,30) <<
+StaffNumber.Right();
+
+This brings up two issues
+- segments of fields being part of a field list in an output layout or report
+- field display widths & default formatting!
+
+StaffNumber.Right() only makes sense if the field has a default width within which it should be right-aligned.
+
+Thus the current dbFieldList can be somehow adapted/related to dbSegList, which doesn't include a default database.
+
+Implement with:
+dbSegmentList& dbSegmentList.operator<<(dbFieldSeg&)
+and constructor dbFieldSeg(dbField&)
+
+Further - allow formatting with a .printf method which takes a standard printf mask, for the relevant data-type, as well as simple methods such as zeroFillRight.
+
+Thinking about this a bit more, I don't like the idea of adding a field segment type orthogonal and public to segments. In the same way as a field involved in a search has some flags, I think the above could have segment flags or modifiers attached. This adds scope for user-defined moderators!
+
+Further - moderators handling should be by a mixin class - numeric and char field classes inherit their moderator handlers.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/11/29-30
+ASSORTED IDEAS
+deferred operator= for People.Apply(People.Salary*=1.1;)
+- puts on an execution stack, 
+- next database operation performs that, unless inside an Apply
+- consider this approach for evaluating searches against current selection
+
+Query Classes A==B
+- the operator is a class so can have user-defined classes for unary, binary and stream ops
+
+- mixins for search operators on fields 
+
+People.All().Salary *= 1.1;
+- People.all() returns copy of People with flag set
+
+Implement both forms of relation setup
+dbConnect theDB;
+theDB.Relate(People.Visits, Visits.Person);
+
+and 
+People.Visits = Visits;    // uses dbField* operator=(dbField&)
+Visits.Person = People;
+
+Apply(function) uses functors!
+- People.Apply(SendBirthdayCards());
+
+SendBirthdayCards() is a functor descending from dbApplyFunctor(dbTable*) and Apply invokes it for each record in the current selection. SendBirthdayCards is defined as taking a dbPeople* and so has direct access to all the fields!!!!
+
+
+User-defined relations - again setup as functors. Spectrum of relations:
+1) OID-based, by assignment
+People.Visits = Visits.AsParts();    
+Visits.Person = People;
+
+1) field-based, by assignment
+People.Visits = Visits.AsParts().By(Visits.PatientNo);    
+Visits.Person = People.By(People.PatientNo);
+
+3) explicit OID based
+theDB.RelateParts(People.Visits, Visits.Person);
+
+
+4) explicit by field
+theDB.Relate(People.Visits.By(People.PatientNo), Visits.Person.By(Visits.PatientNo));
+
+5) User-defined
+theDB.Relate( 
+   RelatePossibleGrandparent(People.Grandparents, 
+                                             People.GrandChildren)
+);
+
+
+The user-defined relation defines some form of Relate() method.
+RelatePossibleGrandparent::Relate(dbPeople* gparent, dbPeople* gchild) {
+	gparent->Search(gparent->Children.MatchesAny(gchild->Parents) || 
+	                         (gparent->DNAtype==gchild->DNAtype &&
+				  gparent->Children.Exist())
+				)
+
+
+
+- VIEWS
+Rename dbFieldList as dbView - this is obviously the same concept as Views in other db's.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/12/04
+RELATIONS
+Concepts to use to implement relations
+1) direct offset in record pointing to related record
+2) copy of OID field pointing to related record
+3) BLOB field containing OIDs of related records
+4) separate table mapping OIDs of two tables together
+5) separate table for all OIDs of a given type, also qualified by table OID.
+6) procedural join over common values in fields
+
+Following links
+Traversal paths are evaluated in two ways:
+1) the traversal path is followed from the lhs to get a related selection of records and load buffers. In some circumstances, a related selection is iterated over.
+
+2) a field in the related file is searched and the path followed back from the rhs to give a resulting selection in the file that's the target of the search.
+
+Ways to think about the problem:
+A traversal link resolves to a dbField. Thus, the dbField has to know that it is a special case and how to trigger other actions.
+P1) How does the field know it is a special case
+1) Smart pointers can be used to make some temporary setting active, a transitory static flag
+
+2) The dbField can be a copy of the original dbField, with a flag set at the time of copying.
+
+COMPETING ISSUES (described in context of dbPeople & dbVisits)
+1) Need a pointer (smart or otherwise) in dbPeople that resolves to a pointer to dbVisits, so we can write expressions like:
+People.Visits->VisitDate;
+
+2) We must have a record buffer and possibly iterators at the far end of the relation chain. This doesn't mean such should exist for every intermediate file in a chained expression, but bear in mind that the smaller chains (ie 2 of 3 steps) are individually valid.
+
+3) Field access should not be made too much more complicated. ie: want to avoid a performance hit on EVERY field access.
+
+4) Cloning a dbTable subclass is painful - we need to be sure the pointer members are correct. eg: there is an initialization order problem when we have
+
+dbPeople->dbPeople (boss/worker)
+dbPeople->dbVisits->dbPrescriptions
+
+One major problem is that the OOFILE_Dictionary mFields in the dbTable refers to a set of actual classes in the original, prototypical object. This is not a problem in most cases, but here we are likely to want to iterate over these fields and make some special setting.
+
+If it turns out we DO need to update the OOFILE_Dictionary (ie: actually clone it, not just another reference) then we could use the copy constructors for the dbField subclasses, as each is copied it calls a static dbTable method (very similar to the registration pattern on construction).
+
+DO WE NEED DO THIS?
+
+(possibly, down the track, when we write a dynamic interface that solely uses the OOFILE_Dictionary to navigate relations, rather than the concrete data members, but I don't think so for now).
+
+RESOLVING RELATIONS
+Storage access, eg:
+People.Visits->Prescriptions->Drug="RU123";
+
+It is NOT the job of the field at the end of the chain to care about the relationship. It works just the same as any other field.
+
+Thus, we need the chain itself to react specially, to ensure that when the field talks to the record buffer, that it is talking to the correct one!
+
+What we need is for the -> on Visits to perform some action, then return a Visits*. This is a circular action, so we can't just do it with a dbVisits::operator->. What we need is a Ref_dbVisits type which is a smart pointer to a dbVisits.
+
+Note, even though there is a smart pointer now involved, it still doesn't know in which direction the operation is flowing!
+
+ie: at the time of processing the dbVisitsRef in People.Visits->, it is not known whether a data access is being performed on the field at the end of the chain, or a query expression is being built!
+
+However, this decision making logic can be buried in the backend class - all the smart pointer needs to do is tell the backend of the traversal that took place.
+Note that this allows the backend to build up a (static) traversal chain, not just a single step!
+
+At evaluation time (data access) the backend checks if any traversal chain exists and does appropriate searches to load the context.
+
+This works fine when there is just one traversal chain in an expression, but what about an expression with chains on both sides of an operator?
+
+People.Search(People.Visits->VisitDate==People.Doctor->Birthday);
+
+
+As far as I can determine from the ARM and other sources, the order of evaluation of the lhs vs rhs is not guaranteed.
+
+The ideal would be something like:
+- evaluate lhs to a dbField
+- call its operator==  ( in which we could evaluate the static relation chain)
+- evaluate the rhs
+
+Thus, we must accept there will be two relation chains floating around, possibly without dependable order in their construction (ie: lhs first).
+
+Thus, we need a way to determine
+1) if an additional relation chain link starts a new chain or appends
+2) which chain belongs on which side, ie: to which dbField
+
+Remember, each dbTable class in the chain is actually a different object, to look at a very contrived example:
+
+Visits.Search(Visits.Prescriptions->Drug->Cost=1000000);
+People.Visits->Prescriptions->Drug->Name==Visits.Prescriptions->Drug->Name;
+for each lhsName
+	search the current Visits set for matching Names
+	if no matches, drop current lhs record
+
+for each lhsName
+	search for names
+	Union names and current Visits sets
+	if empty, drop current lhs record
+
+People.dbVisitsRef.operator->()dbVisits->Prescriptions.dbDrugsRef.operator->()dbDrugs->Name
+lhs.operator==(rhs)
+operator==(lhs, rhs)
+People->Visits1->Drugs1  == Visits->Drugs2
+
+eval chain A...objectX
+eval chain B...objectY
+call operator==(field1, field2)
+field1->table->objectX
+
+People.Boss->Name[1] >= People.Boss->Name[2];
+
+
+INVARIANT
+Either relation chains are identical, or they end with a different physical object.
+
+The rhs Visits is a physically different object from the lhs Visits. Thus, in appending relation chains (from,to) it should be possible to distinguish the end of one chain from the previous node in a chain (ie: we can work out when we are starting).
+
+Enough already!
+
+I'm pretty confident that, with a fair bit of behind the scenes, the above scheme can be extended to handle multiple chains of relations and relational expressions on both sides of the operator. For now, I just need single-step relations for the Heritage system.
+
+SUMMARY
+People.Visits->VisitDate;
+consists of
+1) the original dbPeople object
+2) a dbVisitsRef forming the link to
+3) a copy of dbVisits responsible for managing related records, and NEVER used by itself (only accessible via 2) ).
+
+
+LATER HORRORS
+If you consider the chain of object scenario, where each destination of a relation chain is a clone of the prototype dbTable, what happens when you generate these chains?
+- how do you handle circular relations, direct or indirect?
+- OTOH we've argued pretty convincingly that you need some form of copied being pointed to by a traversal ref, just to be able to distinguish the last item on the lhs chain from the start of the rhs chain.
+- is a dynamic solution the way to go?
+
+94/12/17 FURTHER THOUGHTS TOWARD A SOLUTION OF RELATION CHAINS
+To clarify things let's set some terminology:
+A "prototype" dbTable subclass is the original, concrete variable.
+A "sub-collection" is a clone from a prototype, used as a second iterator over a range of records.
+A "reference clone" is a clone from a prototype, used in the mechanics of resolving relation chains.
+
+1) Each relation chain obviously starts from a prototype or sub-collection
+
+2) There is ONE reference clone for each prototype (NOT the multiple, cascading clones originally conceived)
+
+3) For data access, We need to distinguish between the initial traversal of the relation chain, getting some distinct record(s), and the repeated access to those same records for other fields. The terminal table's selection can be invalidated by
+- changing the starting table's selection/current record
+- explicit addition/deletion of related records along the chain (locally)
+- possible multi-user interference as above
+
+4) When traversing a chain, even in a recursive situation, we have to assume it will be bounded. Thus we introduce the concept of a Selection Stack (or chain). This contains the (possibly 1) record(s) at each step in the chain. Note that iterating over the records at the end of the chain may thus be a nested iteration, if there are >1 records at intermediate points in the chain.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/12/21
+THOUGHTS ON VIEWS, SEGMENTS & REPORT-WRITERS
+In OOFILE, we have GUI integration classes to help build database browsers (please don't get me started on the deficiencies of zApp's table class). The constructors for these browsers take a dbView, something that evolved from my previous dbFieldList class I showed in a constructor example. A full browser control constructor call looks like:
+
+pPlaceList = ZNEW dbSSBrowseTable(this, ZNEW zSizer(windowInterior, sizer()), ID_PLACELIST,
+             dbView(Places) << Places.PlaceNo << Places.PlaceName << Places.StreetAddr);
+
+At first blush, the dbView approach specifies:
+1) the table/database selection to display
+2) the list of fields, from which come
+   - the number of columns
+   - the headers of the columns
+   - the relative column widths
+   - methods to retrieve the data for each cell
+   - the ability to give the user control over what fields are on the browser
+
+Internally, I could have the dbView contain just a list of dbField*'s (and that's what the first version did).
+
+However, the second evolution of dbView& operator<<(dbView&, dbField&) puts a dbViewSeg on the list, by calling theView.append(dbViewSeg(theField)).
+
+All of a sudden we have:
+- a list of objects
+- a generic way to create those objects (operator<<)
+
+ie: dbViewSeg provides a neutral representation, and uncouples dbView from knowing anything about dbField.
+
+We can now add dbViewSegs's that display constant values, perform calculations, anything we like.
+
+So, our stream idiom has turned into a way for creating lists of functors.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/12/24
+INDEXING
+All indexes other than those defined as straight field indexes are subclasses of dbDerivedIndex. This includes
+- user-defined operators (as opposed to derived fields with a direct index)
+- keyword indexes
+- phonetic indexes
+- text locality indexes
+- thesaural indexes (redirected through a lookup table, mapping many->one)
+
+
+TEMPORARY & RAM-RESIDENT FILES
+It should be possible to mark a dbTable as being either temporary (file-based) or RAM-Resident. This could even be done by something like:
+
+CLASS_TABLE(dbPeople)...};
+
+dbTempPeople : public dbPeople { dbTempPeople() { UseTempFile(); };
+
+This approach would be worth trying for Jeff Peck and he could go with the local disk-based temporary while we decided on how to implement RAM-based.
+
+
+
+TRAVELING THOUGHT
+Have another think about how OID-based stored relations are handled before doing much more with the join-based relations. There may be cross-over between the on-disk handling of OID links and the on-the-fly storage of a relation chain.
+
+Can we have caching of relation chains, storing intermediate sets?
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/12/27-28
+RELATIONS (again)
+HOW RELATIONS WORK: the simple approach for version 1
+Major components
+1) the static definition of the relation
+2) runtime evaluation of the relation chain to get a record context
+3) the stored record context & set of records
+
+1) Defining the static relation.
+Take the example of dbPeople and dbVisits and a 2-way relation between People and Visits, being concrete objects of those classes.
+
+We must be careful to distinguish distinct objects (People & Visits) from classes. All the objects used to navigate relations are setup dynamically between specific table objects, not table classes.
+
+From People, a dbVisitsRef field points to a clone of Visits.
+The dbVisitsRef contains its mapping information in an associated dbRelationHalf. Thus dynamic pointer-following through the dbVisitsRef can use the dbRelationHalf to navigate to the related table.
+
+The People table also knows the dbRelationHalf and uses it to propagate deletes and saves (eg: loop through all relations, sending them a Save() message).
+
+Finally the connection has a list of dbRelations which own the respective halves. This ownership is primarily for specifying a single owner to delete all these structures, but is also useful in Describe() to give an overview of relations.
+
+You could think of the connection as having an overall schema view of the database and its relations, where each table has a navigation list of how to get to the next table.
+
+The structure of relations is all built by the definition of the dbRelation, incorporating specifying the two halves. The definition occurs before the dbConnect::NewConnection or OpenConnection and fully specifies the relation.
+
+At New or OpenConnection, once all the tables are built, the dbConnect loops through its relations. For each relation, the two halves are sent to their ref fields by a setRelHalfByWhichWeNavigate. They are also appended to the relevant table.
+
+
+2) runtime evaluation of the relation chain to get a record context
+This is a two-step operation:
+2.1) evaluation of the chain of relation halves from the initial table to the field concerned
+
+2.2) evaluation of the operation, being an access (store to lhs and/or read from rhs) or a search (find matches in the lhs field for the value or list of values in the rhs). The evaluation decides the direction in which we are traversing the relation chain. Are we getting a list of associated records to match the record being edited, or traversing R->L getting a selection in the related table and propagating that back through the chain to yield a selection in the parent?
+
+
+2.1) Each -> encountered from a dbXXRef triggers an operator-> which calls logTransition to build a chain of transitions. We can always distinguish the first in the chain as its LHS table is a "real" table and all the other tables in the chain will be clones for managing relationships.
+
+2.2) We can characterize 4 distinct operations on a field:
+2.2.1) operator= to store a value
+2.2.2) operator cast to return a value
+2.2.3 binary compare, eg operator== (rhs=value or selection)
+2.2.4 assign to an editing field or view for future reference 
+  (deferral of 2.2.1 or 2.2.2, stored as a pointer or reference)
+
+One important difference is the timing of evaluation of the relation chain vs the use of the field.
+
+Current evaluation of 2.2.2 is buried inside OOFILE_tableBackend_ctree and does a search when appropriate. We use a Context objext to maintain the current reord on the lhs.
+
+OOFILE_tableBackend_ctree::validateContextInCaseRelated is invoked at any point at which the data is loaded or saved in the backend. It sends a UpdateRHScontext to the dbRelationHalf which was saved by logTransition in parsing the operator-> earlier.
+
+The main flaw with this approach is that it parses the operator-> to a static list, then there is no connection between the list and the above validation. We have a tenuous dependence on the order of evaluation being the same for the reduction to a dbField& as for the actual invocation, eg:
+cout << People.Name << People.Visits->VisitDate << People.Visits->Why;
+testing has proved that the two operator-> are called before the operator<< on the fields.
+
+One thought with the matching process was to look at the end-points and say that VisitDate can only be in a relation ending at the cloned dbVisits. What if different traversal paths end at the same clone? (We've already discarded the combinatorial explosion of a unique dbTable clone for every possible related field).
+
+HOW DELAYED CAN AN EVALUATION BE?
+Consider a dialog, where a number of related fields are passed to zdbEditLine constructors. The present scheme would have a stack of relation chains contained in some static list. These would be grabbed at the time of evaluating operators on the specific fields.
+
+There is a tenuous link indeed by this coincidental approach. In particular, a non-related field could invoke an operator before a related field and (with the only test being the presence of a relation chain on the stack) be treated as the related field!!!!!
+
+So, there seems no point in continuing with the coincidental approach. IOW we must have a firm mechanism for assigning a relation chain to the field returned by the expression.
+
+Evaluation of the sub-expression:
+People.Visits->VisitDate
+- creates a relation chain
+- returns a dbDate field VisitDate
+- somehow assigns that relation chain to VisitDate
+
+Things to consider:
+- the operator-> returns a dbTable* (actually a dbVisit*)
+- the dbDate returned at the end of the chain is a member of the above dbTable*
+
+Solution One - mega clones!
+We could create a special dbTable* & clone every field in it so as to guarantee returning fields that know about the relation chain.
+
+This has a potentially horrendous cost - imagine 30 fields out of a table with 200 fields, being put on an editing dialog!
+
+
+Solution Two - don't do it.
+That is, don't allow the syntax which returns a dbField at the end - use something that forces a function evaluation at that point. The mega-clones scenario has to clone the entire table and set each field to point to the relation chain, because the relation chain doesn't know which field it invokes. We can use the coincidental approach originally tried, but have a function which is guaranteed to be evaluated at that point, returning a dbFieldRef.
+
+Evaluation of the sub-expression:
+People.Visits->VisitDate()
+- creates a relation chain
+- calls VisitDate.operator()
+- operator() immediately retrieves the relation chain, and creates a dbDateRef pointing to the related VisitDate.
+
+
+To Ken
+I've been thinking a bit more about field()
+
+There's still potential for people to screw this up, if they pass a straight field reference into another procedure, eg dialog as I showed you.
+
+So, how does this grab you:
+
+1) the parens are optional on direct field references but mandatory on related fields
+2) in "OOF_debug" mode, we do generate a clone for the terminal table in relations (the same as the current approach - one clone generated at startup)
+3) if a cloned field is passed into a procedure, instead of a dbFieldRef, then we have a runtime error
+
+As far as I can work out, this makes everything legal except direct operations on related fields (ie: without parens) and lets us have removable runtime checking to stop the latter.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/12/29
+SAVING RELATED VALUES
+Are there ever times when related records should be NOT saved automatically?
+
+I think this can be left for later, probably as an attribute on the Ref or Set used to map the relation. For now, let's assume that dbTable::SaveRecord should propagate Saves down all its relations.
+
+When we have a set-valued relation (ie: N records) there is a possibility of multiple records being edited before being saved. (ie: you DON'T write out Visits and then cancel the Patient). Thus, we need a stack of modified record buffers. Other records can be lazy evaluated - just re-read the buffers if necessary (for now). Later we can cache them and register them with the database manager as flushable storage.
+
+Returning to the propagation issue, this brings up the point of exactly what form a table stores its relations in. We have moved to field-based relation chains in expressions.
+
+The real question is how dirty contexts are stored. Issues:
+- refreshing related values must draw from the cached dirty buffers
+- want efficient mechanism for propagating saves, but can probably make this the least efficient as from UI point of view not time-critical
+- want to avoid duplicates. Multiple related fields must know they are in the same context and refer to the same context buffer
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/12/29
+STREAMS FOR SETTING RECORDS
+Need manipulators:
+- endRecord
+- setDivider(char)
+
+Thus will be able to take streams exported from 4D with dividers such as char(3).
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+94/12/29
+RESPONSIBILITIES IN RELATION
+
+dbField
+- point to dbRelChain if related field
+- invoke dbRelChain::validateContext
+
+dbRelChain
+- contain list of dbRelHalf
+- iterate over list to updateRHS
+
+dbRelHalf
+- contain map of link between concrete objects (lhs & rhs tables & join field)
+- contain context for lhs table
+- update rhs table if lhs context change, when validate
+
+dbRelRefBase
+- point to outgoing dbRelHalf from enclosing table
+
+dbTable
+- contain list of dbRelHalf
+
+REMINDER
+Relation chains are fleeting references used to manage field access.
+Relation halves are concrete objects attached to tables to navigate to the next table.
+
+MULTIPLE CHAINS WITH SAME SEGMENTS:
+At any given time, a number of relation chains can start from the same object and end at different tables. Fields in the same end-point refer to the same record. There is no such thing as mid-point context, from the point of view of fields!!!!
+
+a) People.Visits->Doctor->Name()
+b) People.Visits->Why()
+
+The Visits in a) is NOT the same context as b). Externally, we are NOT obligated to retain any context in the a) Visits.
+
+Implication:
+We can't just propagate SaveRecord down a table's relation halves - a table must know all its currently active relation chains.
+
+MULTIPLE CHAINS AND EDIT BUFFERS:
+Multiple relation chains to the same table/records is OK when presenting info, and the current context evaluation even prevents multiple loads (same starting join value). HOWEVER if we are editing a record buffer at the end of the relation, we need all the fields on that table's record to point to the same relation chain so we can point to the same buffer!!!
+
+Implication:
+We need to coordinate creation of relation chains, making them reference counted objects created/returned by the base dbTable.
+
+ADDING RELATED RECORDS
+In a typical editing scenario, we have either:
+1) a related field, or
+2) an embedded browser for multiple related records.
+
+We need a dbRelatedEditMgr class that is like a dbView:
+- has a list of related fields
+- accepts commands to add & delete related records (+ and - buttons on Heritage)
+- subclasses can attach to Spread/VBX objects
+
+LOOKUP FIELDS
+Store lookup values in "array" in Object Soup file.
+
+
+VERY VERY IMPORTANT REALISATION
+I've been shying away from cloning dbTables, whilst thinking of them as the natural handler of related context, because of the copy overhead for a large table (ie: hundreds of fields).
+
+It just struck me that there is no need to copy the USER subclasses of dbTable - we can clone a base dbTable off a dbVisits* and just get the iterator, backend etc. that we need. dbTable::operator= already clones the backend, so we get the selection copied.
+
+
+MANAGING CONTEXT IN RELATION CHAINS
+For each link that is a dbRelRef (ie: max 1 rhs object) we only need the context contained in the dbRelHalf. (NO we don't - use the dbTable clone!)
+
+For each dbRelSet link, we must have a cloned dbTable to manage the rhs.
+
+If we connect each built relation chain to the dbTable, with the dbTable sending a "msgContextChange" to the chain, then we don't need the comparison-based method of checking context:
+- we don't have to wear the overhead of checking
+- the base dbTable doesn't need to carry a context (leave for now)
+
+95/01/01
+MORE THOUGHTS ON RELATIONS AND EDITING CONTEXTS
+1) Sequence when we invoke dbRelRefBase::newRecord
+- performs a logTransition to add the final step (it's one link short of the chain to a field)
+- invokes same logic as dbField::ConsumePossibleRelationChain
+
+Note: there are 2 possibilities:
+- the newRecord precedes declaring any related field expressions, so it actually constructs the chain
+- the chain already exists because of prior activity or declaration of fields, in which case it just gets a constructed chain, exactly the same as fields
+
+This brings us to another important (overlooked) question:
+
+WHEN DO RELATION CHAINS DISAPPEAR?
+Possible times:
+- when saveRecord is performed explicitly on an associated link or propagated from the base table
+
+- not until the base table goes out of context, or an explicit flush operation called
+
+- can we link them to a dbEditMgr as output vs edit fields, so it manages the flushing?
+
+Consider having an output browser & record editing with related fields
+- listed on the browser
+- on the editing dialogs.
+
+What happens when the user chooses OK, cancel, nextRecord if we have automatic?
+
+DECISION:
+For now, leave all relation chains active until the base object is deleted. Later can introduce reference count logic so they are automatically disposed when all referring fields are deleted and all dirty buffers saved. Will probably also want some kind of unloadRecord on dbRelRefBase.
+
+Saving is handled as a generic thing for all dbTables - allowing
+- requireExplicit
+- saveAutomatically
+- requireExplicitAndBuffer (this is set on all part tables in Owner-Part rel)
+
+As we have already got ContextChange in place, it can handle these decisions!
+
+
+
+There is no need for operator() to call ConsumePossibleRelationChain
+we can put this inside the dbField copy constructor - this way the only thing being performed by operator() is forcing a copy to be constructed.
+
+However, this still leaves the situation of exactly HOW does the cloned field get pointed at the correct backend??
+
+It is starting to seem very much like the accidental side-effect of setting dbTable::sCurrentlyConstructing should be the way to go. However, the problem is that we have two different cases with different orders:
+
+1) newRecord is called on a related file. The dbRelRefBase::newRecord ends up constructing a table as a side-effect, and setting this flag
+
+2) a field reference occurs prior to the newRecord??
+CAN WE GUARANTEE THAT RELATED FIELD OPS HAVE SOME CONTEXT SETTER BEFORE, THAT SET dbTable::sCurrentlyConstructing
+- Searches on related fields
+- pointers to fields for GUI's
+- inline record access - report-writer
+
+YES
+also make an OOF_Debug bit that copies the original backend and alerts if a related field doesn't have a different one
+
+It should be possible for a field to create a backend and a table to be set to it!!!!!
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/01/19
+RELATIONS and CLONING FIELDS
+(see Design Decisions for the basic decision)
+
+Issues in copying a complete table:
+- copying fields - same mechanism as the definition of a table - assign to the table via sCurrentlyConstructing.
+
+This implies constructing a new empty OOF_Dictionary, and letting it fill up, and setting the field mTable and mBackend IDENTICALLY to the definition of a new front/backend pair of classes.
+
+The only difference is, depending on context, we need to copy the selection across.!!!!!
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/01/20
+PASSING OPTIONS TO BACKENDS
+Use functors for table and connection-level options. This lets us encapsulate c-tree options such as file open type, whether files are encapsulated in a superfile or not.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/02/04
+VIEWS AND SAVING RELATED RECORDS FROM EMBEDDED EDITORS
+The "replace" strategy for saving listboxes can be part of an import-replace logic.
+
+Furthermore, the parsing in this can be general for importing tab-delimited data!
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/07/27
+AD-HOC OBJECT CONSTRUCTION
+As a sample, and maybe very useful for Web databases, consider a database where you can arbitrarily add fields to each object.
+
+You would have a parent object and a set of blobs, which are indexed either as keywords or by some method.
+
+Architectures:
+1) current separate blob file, with another file containing list of offsets
+2) blobs as objects, each with their own OID and an owner OID. When collectin them for a given owner, search by owner OID.
+
+Further thought - consider 2) as a general BLOB architecture anyway, the blobs in the blobs file can all have their OID value in a header.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/03
+KEYWORD INDEXES AND SAVING
+Scary thought for the day (to test ASAP) - are non-ISAM indexes cross-platform?
+(NO - checked the c-tree discussions - you have to flip them yourself)
+
+From discussions with Liam Breck, arose the idea of index pools:
+
+if you wanted to search in some, but not all, keyword indexed fields of a table I *could* come up with a different interface. This would still be doing lots of joins behind the scenes.
+
+Hmm, that just made me think of something. IF this kind of situation were common, you might have several "pools" of keywords. Thus, you could define a couple of pools for a table and assign different fields to them. The pool setup and searching could look something like:
+
+CLASS_TABLE(dbPeople)
+  dbChar   Name;
+  dbText   Address;
+  dbText   Resume;
+  dbText   Qualifications;
+
+  dbKeywordPools  Personal, Professional;
+
+  dbPeople() :
+           dbTable("People"),
+           Name(80, "Name", kIndexCompress),
+           Address("Address"),
+           Resume("Resume"),
+           Qualifications("Qualifications") 
+  {
+     Personal << Name << Address;
+     Professional << Resume << Qualifications;
+  };
+};
+
+
+dbPeople  People;
+People[People.Professional.hasWord("c++")];
+
+Note: using [] alternative to Search() just for variety.
+
+
+Indexes that are pooled are things like keyword indexes. The distinction that should be drawn is between indexes used solely for lookups and those that define a sort order as well (private).
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+QUERIES NEEDED IN MORE PLACES
+95/08/03
+Consider these situations:
+1) cloning a dbTable and not wanting the current selection
+2) combining queries in a loop, rather than a fixed expression.
+
+We need extra operators and constructors that take dbQueries as parameters:
+1) a dbTable(dbQuery&) constructor. As a corollary, have two special query methods cloneAsAll() and cloneAsEmptySet(). Typically we would
+
+dbPeople temp(People.cloneAsEmpty());
+
+
+2) We should be able to assign and combine straight queries, eg:
+
+People = People.hasWord("Andy");
+People += People.hasWordStarting("Dent");
+
+3) We should be able to do something similar with queries, (Noting that the following may break the inheritance structure currently in use). These would be particularly useful in building gui interfaces to let users specify queries.
+
+dbQuery Q(People.Name=="Andy");
+Q << dbQuery::Or 
+   << dbQuery::openBracket  
+   << (People.Age>18) 
+   << dbQuery::Or 
+   << dbQuery::openBracket  
+   << (People.Age>21)
+   << dbQuery::And 
+   << (People.State=="CA")
+   << dbQuery::closeBracket  
+   << dbQuery::closeBracket;
+
+Alternatively:  
+dbQuery Q(People.Name=="Andy");
+Q.Or();
+Q.openBracket();  
+Q+= (People.Age>18);
+Q.Or();
+Q.openBracket();  
+Q+=(People.Age>21);
+Q.And();
+Q+=(People.State=="CA")
+Q.closeBracket();  
+Q.closeBracket();  
+
+
+The SIGNIFICANT difference here is that we are building a set by combining the RESULTS of simple queries (2) vs building a complex query which the backend may optimise for us (3).
+
+
+4) In particular, we should be able to build queries for common occurrences such as searching a list of any keywords. There is direct support for this in c-tree and it would be a shame not to use it (the Batch Keys mode). A syntax might be:
+
+People.hasWordMatchingAny() << "Dent" << "Andy" << "Fred";
+
+OR (flash!)
+
+How about generalizing this principle to any non-operator search (eg: hasWord()) in that providing a stream form like the above makes it a multiple value search implicitly OR'd.
+
+This is very orthogonal, we could at the very least use it to reduce special keywords, eg applying to hasWord, hasWordSoundsLike, hasWordStarting, soundsLike etc.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/05
+INDEXES - RANDOM THOUGHTS
+Index classes should be orthogonal to data members so it is easy to add new ttheir own operators.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/06
+OVERALL MODEL FOR EDIT FIELDS AND UPDATES
+When you construct your editing window/dialog (including a set of multiple dialogs as pages), each field has attached a field editor.
+
+When the dialog closes, if saving, the saveRecord message is sent to the main table. This iterates through all the attached editors (***) and copies back values to the fields.
+
+Thus, setting up a dialog is a question of:
+1)  Attach a main table to the editing dialog
+2)  Attach the editors to fields (eg: in the constructor)
+3)  Have an OK button handler that sends a saveRecord to the main table.
+
+This results in very little visible code.
+
+The clumsier (and more traditional alternative) for generation via AppMaker etc. would be to generate:
+1) Setup - copies fields to edit classes
+2) Closure - copies edit classes back to fields.
+
+This is twice the visible code.
+
+***
+The nice twist is that we can put a more abstract mechanism in here. Instead of just attaching edit fields, the attached objects can be anything that a field might depend upon. This could be a serial port handler or an alert that pops up on closing and asks the user a final question.
+
+These connection classes would be abstracts, with concrete classes per framework. 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/06
+FURTHER THOUGHTS ON CONSTRUCTION
+As well as being able to make a dbTable from a query, All or Current Selection, should also be able to make from CurrentRecord - effectively cloning off a single record.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/06
+INHERITANCE
+Inheritance is implemented as multiple tables, when you add data members.
+
+The main problem in this is the building of the embedded parent table - some flagging is required to prevent this. Think about this a bit more - we are really cloning the parent backend.
+
+Multiple inheritance should be possible.
+
+Inheritance can be used for Role Modelling. We can have operators for changing class, that remove a record from the current table:
+
+become(parentOrSiblingTableObject);   // added data members are undefined.
+becomeJust(parentTableObject);    // strips data members
+becomeLike(siblingTableObject);    // copies the additional data members from the current record in sibling
+
+
+Scenarios for exploring this further:
+- changing jobs in a company, without replacing someone
+- changing jobs in a company, replacing someone who moves to another position in that company
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/11
+CASUAL RELATIONSHIPS
+Lets say we want to put a field on an edit screen that is no in the current table and is not in a table with a traversal path defined from that table.
+
+There's no problem just attaching the field description with an EditLink, but we need some way to guarantee that the correct object will be selected.
+
+Thus, the concept of a default relationship. When we define relationships between tables, with the traversal paths, the first one between tables A and B is the default. eg:
+
+relationships added in order
+People -> Companies "WorkingAt"   // default relationship
+People -> Companies "PrevEmployer"
+
+thus People.Companies->CompanyName() is equivalent to Companies.CompanyName() when on a People edit screen.
+
+This frees us to add join relationships at runtime. These may be joined by a method or simple relating values.
+
+We can do so by specifying the default relationship explicitly, eg:
+
+dbRelation temp(People.Name, Companies.TempCEO);  
+// minimal definition over join fields, no traversal paths
+People.setDefaultRelationship(temp, Companies);
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+95/08/11
+POWERPLANT FRAMEWORK LINKING ALTERNATIVES
+I've been a-delving into the PPob stuff - the magic all-in-one resources.
+
+It would appear I can bung some stuff in there to make EditField linking to the database automatic. If I wanted to get carried away I could have the entire database schema in there!
+
+Just to clarify the picture, when you create a dialog editing a database table, the edit fields on the dialog (LEditField) are linked to database fields by a dbEditLink. There is a lightweight dbEditLink created for each edit field.
+
+So, the choice is between:
+
+1) have all this stuff set in the PPob resource, so there's no visible code to indicate that we are editing a database
+
+2) leave the PPob as is, defining the edit fields, and have the dialog's FinishCreateSelf() method create the appropriate dbEditLink's.
+
+The "freedom" of using the PPob is mainly that you could use Resorceror or Rez (not ResEdit) to change which database fields are linked to which edit boxes.
+
+I lean towards 2) particularly as it will look more like the code on other frameworks and so be far easier to port. However, I've a suspicion that some "resource junkies" might prefer 1).
+
+Another point against 1) is that it requires people to be able to browse extended PPob's. I don't think Constructor allows this, so it would only be usable by AppMaker and Resorceror users. Given that AppMaker users probably don't care either 1) or 2) it seems that 1) is in the category of "cute idea but not practical".
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+IMPLEMENTING COMPOUND INDEXES
+95/09/21
+Goals:
+- easy syntax to declare
+- descend from dbField, and have read-only access to calculated values
+- minimal impact on current backend logic
+
+Ideas:
+1) Don't have any constructor-based declaration other than field name -
+segments are assigned in the body of the constructor. 
+
+Issues:
+- breaking any assumptions that dbField::fieldNumber() maps directly to
+a DODA field number (if people mix in derived fields, they don't have a
+DODA slot). However, we've already broken this assumption as we insert
+extra DODA fields as fillers to get the padding. 
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+BUILDING CTREE INDEX DICTIONARIES
+95/09/23
+Context:
+1) We want to post-process the schema definition so that it a field X
+has been included in a compound index, we can set X to use the compound
+index 
+
+2) When we evaluate a search AND clause we want a way to pick an index.
+A compound index of N segments can cope with any expression involving
+it's components where the == operator is used on leftmost 1... N-1 of
+the components and any operator used on the trailing component. In most
+cases, this would be a 2-item index, eg: LastName+Salary where we could
+search People[People.LastName=="Dent" && People.Salary>=4000];
+
+Ideas:
+- it's easy to build a key by concatenating the unsigned short field numbers.
+- let's be very simplistic for now and only optimise expressions of two
+components This gives us a fixed search buffer. 
+
+Needs:
+- an overall index dictionary that provides search capabilities
+- index descriptions that provide comparison for the search dictionary
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+MULTIPLE CONNECTIONS
+95/12/26
+Our current method of associating tables with connections is by order of definition - create a dbConnect_ctree, then create the dbTable subclasses.
+
+A neater way to do this is to create your own connection subclass containing the dbTables. The mechanism will work exactly the same behind the scenes, but the syntax makes it easy to create and destroy connections for multiple opens at the same time.
+
+A different variant would be your own database class, where the first member was a dbConection of the right kind.
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+RUNTIME EVALUATION OF RELATED FIELD SYNTAX AGAIN
+96/01/12
+Looking back over the way relationships work, it seems very convoluted at present. There's a lot of runtime evaluation on field access and the need for parens on related fields is annoying.
+
+This need seemed to be driven by ideals about having field expressions evaluated at runtime, given comments on 94/11/29 and similar dates.
+
+In particular, given circular relationships, you had to limit instantiation of related tables to avoid disappearing into a spiral at startup.
+
+Given an expression People.Visits->VisitDate, a simple approach would be to have People.Visits returning a pointer to a Visits object that contains fields that know they are related and to whom.
+
+KEY ISSUE
+We may only have one database extent (ie our prototypical dbPeople) in a connection, but we can have multiple selections on that database which implies multiple dbPeople objects. Thus, for each relationship, they theoretically have a separate related table each.
+
+The current philosophy is to only create these related tables when forced to by a relationship traversal. The map of the traversal is built by dbRelRef::operator-> and the traversal instantiation triggered by dbField::operator().
+
+TODAY'S INSIGHT
+We can get the same result as the above, with very similar implementation, but avoid the need for the parens on the field expressions.
+
+The trick is:
+1) Instead of building the map, the operator-> instantiates the relation (cloning the destination table)
+
+2) The cloned fields of course know they are in a relationship. We already have dbField::validateContextInCaseRelated() called in all field accessors, so there is no modification on that side.
+
+FINALLY
+All relationship cloning propagation (for related selections) works the same way. That includes cloning descendant tables for inheritance. 
+
+THE BIG POINT ????????
+The immediate cloning for all relationships takes place at the definition of the prototypical (main extent) tables. 
+
+
+GOTCHA
+One reason for accumulating the traversal path and instantiating in one go was to cater for other backends. It is entirely possible that an SQL backend or other database would provide this as an efficient native function! Step-by-step instantiation may break this. We can maybe work around this by having the step-by-step creation of dbTable clones all point to the traversal path anyway. (Something necessary for backtracking a related search.) We don't actually perform the data relation at each stage, just build a place-holder dbTable clone. When the field at the end of the expression executes dbField::validateContextInCaseRelated, each of these placeholder tables will perform its join. Following discussion with Ken, he agrees that this sounds feasible and is probably no more overhead than the current approach.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/01/12
+4GL-STYLE EXPRESSIONS, FOR
+
+In the same manner as we create dbQuery objects, operators such as dbNumericField::operator+() could create an dbOper to be applied later.
+
+We could use dBase style expressions such as
+People.forNext(5).Bonus.set(People.Salary*0.01);
+
+There should be a way to create user functors, and table-level functors.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/01/13
+ODMG-STYLE OBJECTS
+In ODMG syntax, you create an object (eg: a dbPeople) and after setting it, commit it to the database. That is actually very easy for us to detect. At present there's a test to see if the current connection has finished being constructed (it's open). This causes a dbConnect::raise() but could also be used to determine that the new dbTable is a floating object, not yet committed to the database. Once committed, the dbTable becomes a selection of one.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+MAKING IT EASY FOR USERS TO MIX IN OOFILE CLASSES
+96/01/13
+We may have some users want to mix in an OOFILE dbTable class to make their existing classes persistent. This requires some mapping from their data to the OOFILE class. However, it would be nice if this fitted in with the saveRecord() call that might be made automatically in a GUI app. (eg: pressing a standard NextRecord button will cause the OOFILE helper classes to eventually call saveRecord() on the table being edited.)
+
+Thus, how about putting a userSave() function that's virtual in that saveRecord() can call. This would be a null function on dbTable and the user could override to copy their data across.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+REVISITING dbView
+96/06/23
+There are building complications in GUI's that have things like browsers operating simultaneously with editing fields - it's awkward forcing the user to clone things. If they have a list and edit fields displayed separately, but straight onto the same database, then the iteration through the list moves the current record for the editors.
+
+What if dbView was
+- a lightweight clone of the dbTable - giving just the backend and relationships to the table, without forcing cloning of all field members
+- attached clones of all fields in the view
+
+What's needed?
+- the backend must be copied to give us storage and state
+- the backend can point to a shared selection
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+SUPPORTING COMPLEX REPORTS AND GRAPHS
+96/06/26
+
+Most of the Kidmap reports and all the graphs are totalising reports, eg:
+% of students awarded this Learning Area at each Performance Level
+
+The current dbView-based report-writer and graphing engine can't cope with these kind of reports. The options seem to be:
+- build the totalling/searching functions into views 
+- allow the user to create a view or dbTable in memory and to write their own results into it (the construction approach used in the current VB version).
+
+The latter is appealing as it also allows us to market the graphs and report-writer independently of the database OOFILE core.
+
+Scattered Thoughts:
+
+- just defining a dbTable after the current connection has been opened (or never created, ie: dbConnect::sCurrentlyConstructing==0) makes the dbTable standalone.
+
+- we could allow user storable fields in a dbView, so the main part of the view can be the existing fields in a database and we add a field for the calculated value being graphed.
+
+- should standalone dbTables be implemented with a simplistic backend? If so, how do we know when the table has been constructed, and we've stopped adding fields?
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+GENERAL PROBLEM WITH FIDDLING WITH RELATED SELECTIONS
+96/10/24
+
+The context is wanting to directly load a record in a related selection, when we have a dbView pointing at that related selection.
+
+There are a few possible approaches:
+1) use the relationship to get the OID to select, but work on a dbView in a non-related selection.
+
+2) make it possible to use selectJustOID and similar calls to force a selection in a related table. This may have wide implications. There is an extensive set of code for the lazy evaluation of related tables that tries to invalidate the relate table, and load its selection by the relationship. Anything mucking with this selection is in danger of having its selection vanish out from under it.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/06
+SORTS AND SELECTION CHANGES
+There's a problem with stSaveSelection 
+(hmm, can't remember what it was!@@#)
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/05/09
+WINDOWS DLLS AND OOFILE
+
+We just got bitten by the Windows DLL's in a particularly nasty manner to do with mixing construction. It's a subtle and interesting problem.
+
+Given a search like:
+
+People.search (People.Name == "Andy");
+
+dbQueryBinary
+dbChar::operator==(string)  // is a tiny factory method:
+{
+	return dbQueryBinary(new dbQueryField(this), dbQueryClause::equals, new dbQueryLiteralStr(str));
+}
+
+Note that as it is creating the concrete object in the return statement a compiler should be able to optimize out the extra copy step normally involved in returning concrete objects.
+
+The key class is dbQueryBinary which owns pointers to polymorphic left and right sides of the query.
+
+People.search() takes a const dbQueryBinary&
+
+This is a const reference to the *temporary* query returned by operator== so there's no further copying involved.
+Because we have a local temporary concrete object, it will be destructed on the closure of the search() call. Its destruction takes place in the user code.
+
+Therein lies the problem.
+
+The operator== ran in the DLL and so the new lhs and rhs objects it created are in the DLL heap.
+
+With deletion occurring in the user program, a memory error results because the dbQueryBinary dtor attempts to delete these two objects which are in a different heap.
+
+The above lightweight factory/temporary reference idiom is extremely efficient and I'd hate to have to start copying the lhs and rhs objects in the dbQueryBinary copy ctor.
+
+One initially attractive solution is to make all these factories inline. They will thus be running in user space and the problew will go away. However some compilers refuse to inline methods that invoke new(), and programmers often turn off inlining for debugging purposes.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/12
+CALCULATED FIELDS
+Discussion with Brad at Mercator about calculated fields - he feels they are not very object oriented.
+
+Ideally he'd like to be just able to treat a member function of the table as if it were a calculated field, particularly when it comes to passing it into a dbView.
+
+The main issues seem to be:
+- calculators not knowing when they are being cloned
+- calculators only having access to the rest of the table via downcasting, and thus using the table's public interface rather than being able to call private functions.
+
+I had an idea about using templates to create a calculator parameterized by the field type and user table type, thus it would have an mTable which would be a member of the table and not need downcasting. This still doesn't get around the public interface issue.
+
+Another rough idea - abstracting fields out to an interface class which can be a lightweight return type from a member function of the table.
+
+Think about the Borland C++Builder property extensions. I suspect the big problem is how to declare things so you get a pointer to member functions.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/12/24
+OOFILE SPEED
+Can we avoid DoBatch loading entire record sets, so multi-user FPUTFGET performance is enhanced? The Count would be accurate, just the selection invalid.
+
+Database logger - make sure our output file can be sorted in Excel, particularly by OID + date/time so we can sort the output and get the sequence of operations on the tables.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/01/26
+Thoughts on dBase backend
+- abstract family of connection settings classes 
+- within a connection there's a settings() getter/setter pair
+- within a given type of backend, connectionSettings() downcasts the above
+- settings objects are clonable
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/22
+THESAURUS INDEXING
+Need to check how current word indexing is specified, but it would be nice if we can drop a thesaurus indexer in the same way we have an optional word indexer.
+
+The difference is mainly in the way the indexes are built and searched - the search hasWord and similar verbs remain the same.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/25
+REFERENCE COUNTED STRINGS
+It occurs to me that we can avoid an extra heap alloc in ref-counting
+strings by putting the string counter (just an unsigned short) at the
+front of the allocated data. 
+
+This needs to be tested very carefully on the SPARC architecture. It may
+be that we need to allocate the storage array as an array of unsigned
+shorts in order to guarantee alignment. I'm not sure how stuff ends up
+aligned correctly, so there may be a danger that allocation as array of
+chars is only to a char boundary.
+
+(Later found out this is how the MFC CString works).
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/19
+FIELD CALCULATION EXPRESSIONS AND C-TREE PLUS CONDITIONAL INDEXING
+
+We want a way to combine field names into an expression so it can be used
+- possibly in report-writer calculations
+- in simpler calculated field definitions
+- most importantly (in short term) to take advantage of the conditional indexing in c-tree Plus 6.7
+
+Consider an expression like 
+People.Salary * 0.5
+
+Using a placeholder (Proxy pattern?) we can have an dbFieldExpr returned
+by dbReal::operator*(real) and similar methods.
+
+This oofFieldCalc would be parsable similar to query expressions to
+generate the strings for the c-tree Plus index filters. (is there a way
+to use them in queries also?)
+
+We could also do runtime evaluation of such an expression to provide a
+calculated field which knows about its dependencies.
+
+Like the dbQueryClause it is easily created by runtime logic.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/19
+SAVING SCHEMA
+
+Tables and connections should have a method to output a c++ declaration
+including the logic to setup relationships (extractDeclaration & extractImplementation).
+
+We can then generate a simple program to handle some dBase files with
+OOFILE based on the current ability to open a dBase file and append
+fields.
+
+Once this ability is extended to c-tree Plus schema input, we have a way
+to convert existing c-tree Plus tables to OOFILE.
+
+We still need a long-term way to save a binary schema for re-opening.
+This should be stored in a separate file for some backends and able to
+be stored in resources in c-tree Plus.
+
+Keeping this schema readable (compressed) text will
+- aid debugging
+- allow cross-platform development
+- simplify dBase embedding.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+STRING PORTION HANDLING AND COMPARISON
+98/07/24
+
+For future use, it would be useful if oofString had comparison
+operations that were similar to the PowerPlant LString class, and
+allowed the user to define the comparison.
+
+Thus, people could provide language-sensitive or phonetic comparison
+utilities.
+
+We should have an overrideable default comparison function callback, as
+well as being able to override for specific strings. The rule would be
+that the leftmost string supplies the comparison function, thus the left
+of == would provide the rules.
+
+	oofCompareFunc comparisonFunc() const;
+	void comparisonFunc(oofCompareFunc);
+	oofCompareFunc defaultComparison() const;
+	void defaultComparison(oofCompareFunc);
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+COW STRINGS
+98/07/29
+
+MFC uses a structure which contains the ref count and length at the
+front of the string. I was considering something similar until it
+occurred to me that another idiom we use strongly is the adopt() which
+is used to take over a buffere from another string (not a problem) or
+from a plain char*.
+
+In that latter case, if we had a structure at the front of the string
+we'd have to copy that buffer. This may make it better to have two
+structures pointed to by a string, at least as an option.
+
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+DELIMITED TEXT AND XML BACKENDS
+98/09/19
+With any text-file backend there's an issue of insertions of data, and
+particularly with XML there's the issue that related data is physically
+nested.
+
+I think the key to handling this is similarly to editing engines - use
+of pointers to text and merging of split blocks etc. at writing time.
+
+One issue if we have true insertion on the fly is invalidation of OIDS
+(which would be byte addresses?).
+
+This applies whether insertion is insertion of new records or just bytes
+extending existing records (lines, in some formats).
+
+One way is to have a sorted list of cumulative offset adjustments. Each
+time there's an insertion, an entry is made indicating how much items
+after that point must be offset, and following offset entries are all
+incremented. This means, to translate an original address into a current
+physical:
+- you find the offset entry immediately preceding your addresss
+- add the cumulative offset to your address.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+ATTRIBUTE STORAGE
+98/10/22
+The attribute storage or classification fields needed for XML match a
+generalised query engine, where we have fields multiply classified, eg:
+as a "name" field.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+AUDITING
+98/10/22
+Auditing built-into OOFILE - use an override of the auditing object, as
+extension of more formal debugging log.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/31
+OTHER FIELD TYPES - TRIVIAL USEFUL SUBCLASSES
+
+Utility fields, particularly for GUI
+- calculator for current date or time, can use as default calc for 
+  data entry so 'date of entry' is by default today
+- oofCurrentDateTime standalone field that can link to GUI which has
+  currentDateTime calc as its calc.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/31
+XML PARSING
+
+Would be nice to have OOFILE XML parser independent of report writer.
+- would take dbConnection (thus indicating type)
+- pass in DTD to create table definitions in that connection
+- pass it to an expatpp (or it uses one) to parse data against that DTD
+- would need to be able to ignore some elements (eg: STYLE & LAYOUT)
+- can therefore ship as part of OOFILE core, not report-writer
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/31
+SUMMATION
+Assume vertical summation - attach a sum to a table.
+This would influence the count().
+The sum is reported at the bottom of the current selection.
+This is a generic 'vertical calculator' type.
+
+If we put similar logic only in the dbView we immediately break the model
+where users of dbView call table() and iterate the table vertically, use its
+count etc.
+
+Summing horizontally:
+If we have an accumulator (just a calc field) for a running total, when do
+we reset it?
+
+If this is a dependent of the table itself then tables can broadcast on start()
+which would trigger a reset.
+
+Or, we move this into dbView and give dbView countRows, startRows, nextRow etc.
+and remove table(). This allows dbView to hide different data structures, eg:
+a true array.
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/04
+AVOID EXTRA SAVES OF PARENT RECORD WHEN ADD POINTER-RELATED CHILDREN
+
+Building SampleReports with OOF_Debug defined I ran into "ContextChange on 
+dirty record without saving" because I was adding records to related tables
+and not saving the main table.
+
+This causes me to question the assumption behind how pointer relationships
+work, that makes the main record get saved twice. To speedup traversals from 
+the 1 record to the N (which we do by searching for the OID) we store the
+OID of the record in the relationship.
+
+This can result in redundant saves, possibly many of them propagating back
+up a tree.
+
+The opposite decision would be to somehow make the OID quickly available to 
+the relationship, once loaded, without having to update it.
+
+99/05/07 
+Whilst investigating RAM backend bug found out there's more to it than the above
+as we propagate dirtiness in child records back to the parent anyway, not
+just because of relationship maintenance.
+
+This is probably for GUI warning purposes - editing a child record should
+prompt a "Do you want to save changes" message from the parent's dbEditHelper.
+
+					
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/11
+ALLOW DEFERRED CONSTRUCTION OF VIEWS
+
+When reading in a report from a file, the layout may be encountered before
+the schema. There are other circumstances in which we may want to store a
+textual representation of dbView declaration (eg: in a complex GUI).
+
+The ideal is to be able to store both the table and list of fields, but
+for an initial version lets just assume we init a view to all the fields
+in a table.
+
+We thus need to hang onto the field name (sufficient to lookup from a connection
+later) and we need a connection from which to grab the field.
+
+NOTE: later implemented by knowing the schema, so bypassed the problem.
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/26
+SERIALIZING EXECUTABLE CODE
+Just a side thought from thinking about serialize methods for storing the data
+associated with custom objects: what if we could store custom scripts?
+
+Should this be dBase syntax (an attractive idea).
+
+What would we use it for?
+- calculators
+- queries too complex to be declarative 
+- restoring custom UI
+
+Is this an example of a problem that should be solved with a few specific 
+little languages rather than trying to generalise?
+
+Maybe OOFILE should just provide a tiny threaded interpreter (a la Forth) and 
+let the user define the language.
+
+Should we embed Python, JavaScript or Perl as languages for this purpose, and
+provide APIs?
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/06/13
+NEW SIMPLE SEARCH IDEAS
+(mailed to list for comment today)
+
+Idea was to have simpler way to specify a search on a given field. The following
+have a non-obvious implementation!
+
+2) people->name.search() == "Dent"; 
+or 
+2b) people->name == "Dent";  
+
+rough implementation outline for the above
+- the search() method is a factory, creating a temporary dbSearch object
+  which contains a reference to the field being searched
+
+- as the LHS object, the dbSearch::operator== is invoked to create a
+  dbQueryBinary (using dbChar::operator== in the above example)
+
+- the dbSearch destructor invokes search() on the table of the field 
+  (ie: people) as the temporary goes out of scope at the end of the line
+
+
+To implement 2b) we add a flag to the dbQueryBinary objects to say they've 
+been consumed by a search(). If not, their dtor triggers like dbSearch above.
+This would make copying them complicated and add housekeeping or force us to be
+careful to pass references. I also think it's way too subtle!
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/08/10
+VARIABLE LENGTH RECORDS, OIDS ETC.
+
+What's a good way to tell if a record has been moved, given that variable length
+records in a multi-user database may be moved due to update in another process?
+
+An unlocked record may be in its original location, may have been moved and if
+so, the old location may have been reused.
+
+Maybe we can tell from an attempt to load a record if it has moved?
+
+If we maintain the current method of reserving the first byte for Faircom and 2nd
+for our use, the 2nd byte could be used as an alloc count and we can see if
+that's changed.
+
+Alternatively can we check the key to see what record address would be returned,
+without actually loading the record?
+
+Maybe some kind of local hashed cache mapping OIDs to their disk addresses. If
+the hashed location is invalid then we do a search.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/17
+KEYWORD AND PHONETIC PARSING
+
+Cute idea - have single phonetic subclass of oofWordParser set for dbConnection, used to parse user entries so it will produce phonetic versions used to search index.
+
+Very transparent but be careful about cached strings if reusing this parser!
+
+2nd approach
+- phonetic calculated field
+- may be indexed
+- search separately
+
+3rd approach
+- keyword table itself adds phonetic fields
+
+Side issue - make hasWord... much more flexible as per parameters. May take
+list of strings, delimed or word parser. Front end converts all to list of strings.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/19 Sun
+QUERIES FROM XML
+user-installable queries would have a signature attribute and drop into their 
+own sub-parser, which could be straight SQL in element body, CDML or other
+XML-based syntax.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/09/22
+POLYMORPHISM IN OOFILE
+Maybe the way to have polymorphism is to have a combination of Factory,
+Delegation and Flyweight patterns?
+
+Based on the actual type of a record, a different Behaviour object is used.
+
+Inline functions in the dbTable subclass forward calls to the Flyweight used to
+implement (possibly virtual) behaviours.
+
+A factory is used to create (on demand) a given registered Behaviour object for
+the table.
+
+(Maybe these are all created in one hit so no redirection overhead incurred.)
+
+The forwarding functions will therefore call the current Behaviour object which
+provides virtual behaviour.
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/21
+MATH, QUERIES AND FILTERS
+Prompted by an old newsgroup query.
+>I am using Poet 4.0 under Win95 with VC++.  I have a simple
+>product database and I want to perform the following query:
+>
+>    select x from x in Products
+>        where ((x.OnHand - x.Allocated) < (x.Demand - x.Allocated));
+>
+
+Say we have an operator- for dbField's that defines a dbClause.
+Evaluating a dbClause would perform the calculation, so we get the correct maths
+from int y = x.OnHand - x.Allocated;
+
+However, using comparitive operators defines a search which is an attached function, it evaluates the dbClause for each record using a subclass of dbQueryClause.
+
+dbTable::satisfies(const dbClause&) would process a dbClause (which is a Composite, like dbQueryClause).
+
+We could use this to also have trivial wrappers of calls to member functions.
+
+This gives us:
+1) an easy way to establish filters on OOFILE selections, based on arbitrary criteria.
+
+2) a way to handle searches like the above, eg:
+   x.search( (x.OnHand - x.Allocated) < (x.Demand - x.Allocated));
+   
+   
+FURTHER IDEA
+We can have dbClause attached to a record so it is calculated, and even indexed, as a calculated field. Thus you could evolve a database schema to have common calculation results precalculated.
+
+EXOTIC WAY OUT
+A parallel database could contain the attached calcs, so the original schema is unchanged, using 1:1 pointer relationships to quickly build the selection.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/22
+LOOKUPS VS LOCAL FIELDS FOR SORTING.
+
+Here's a really good example for common use of lookup tables.
+Say we have a Priority table for some task. We want the user to be able to create new priorities and rename priorities. They have a numeric key which is used as the sort order for Tasks.
+
+Classic design says we have a relationship from Tasks->Priority which is used to retrieve descriptions.
+
+We want to keep the key locally in Tasks so we can have an indexed sort field that will also be used for searching.
+
+However, we also want the lookups of Priority to be very fast for descriptive purposes.
+
+IDEAS
+1) Shadow-RAM tables, where the description is stored in an array and the numeric index used to retrieve the string from the array.
+
+2) Simpler would be "shadow fields" where the Priority key field in Tasks is read-only and is a copy of the related value in the Priority record. We will use a pointer relationship rather than relying on the key field, for rapid lookup.

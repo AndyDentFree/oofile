@@ -1,0 +1,368 @@
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+MINIMIZE SELECTIONS
+96/05/12
+With an extensive drill-down interface like KIDMAP, there's the chance we need multiple edit clones. However, the KIDMAP interface lacks navigation commands in the editors - they only need the current object.
+
+Maybe we can move to a model where the editor only has a current object, not a selection, and it talks to a browser to get the next record (ie: doesn't implement nextRecord itself).
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+ALTERNATE MODELS FOR RELATED BROWSERS & EDITORS
+96/06/08
+Looking at the table classes, we are currently ignoring the Insert/Delete Rows in the storage backend - the assumption is that this is only called because a record has already been added to the database and the table is being enlarged to match.
+
+This may not always be true, and is possibly a more complex model than needed.
+
+If we have a model where the user can directly edit the table, it makes more sense to just blindly add data to the table, adding rows as required and letting them edit the rows. (This is similar to that used with Spread/VBX.)
+
+Maybe some form of context check is required for the storage model to know if it should add data to the table or not.
+
+This whole area feels very shaky at the moment - there's possibly too little coupling betweeen our classes and so behind the scenes complex update logic is used. The whole browse/edit dependency feels complex and unstable.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/06/08
+SIMPLIFYING TABLE HELPERS, CLONING AND STATUS DEPENDENCIES
+The rebroadcast mechanism from the effort last month is useful, however the synching cloned selections, and the hassles of cloning selections, are very complex. This makes the AppMaker code generation awkward and would lead to user errors.
+
+PROBLEM:
+Given an editing context, or two, when a browser either in the same or background window is refreshed, the current object is changed in the selection. Thus, it appears we can't directly re-use the selection. At the very least we seem to need different iterators.
+
+POSSIBLE SIMPLE SOLUTION:
+Whilst editing, the edit controls maintain local buffers. The only time that the current record needs to match that being edited is when we copy back. Thus, the edit helper could coordinate this.
+
+COMPLICATIONS:
+What happens to related selections, eg: an embedded line-item table?
+
+Maybe the solution here is to use setSaveOption( requireExplicitAndBuffer ). IF this is implemented correctly at present, it should preserve related records. 
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+96/09/02
+GUI MODELS
+
+We may have to return to the old factory model for some interfaces. There is a distinct difference between the MacKIDMAP editor on same window as list model and the drill-down to dialog by clicking list model.
+
+Possibly the difference is best characterised as whether an editor is open or, if not, how do we open an editor for a new or edit command?
+
+A sufficient extension may be for every dbTable to have a default editor available (possibly through the factory used in the prev implementation).
+
+A more complex alternative is to explicitly recognise separate models or UI Patterns, in the AppMaker level and in the example/generated code.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/26
+THE OVERALL getGUI MODEL AND RELATED TABLES
+
+I just noticed whilst examining the code for the above issues that we have an assumption in the GUI which may limit us. The assumption is that, if you have a browser on a related table, it is dependendent on the GUI of the leftmost parent.
+
+I'm not sure this holds if we say put up a dialog to edit a related table, which needs to coordinate between a local editHelper and browserHelper.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/04/25
+USER-CUSTOMISABLE INTERFACE MODELS
+
+The current PowerPlant interface classes use an Attachment on the LEditField to notify OOFILE when the field is changed.
+
+One user has already objected to this - he has his own subclasses of LEditField which perform this notification - he doesn't see the need for duplication! 
+
+Maybe we can have factory objects attached statically to classes like dbFieldLink, that set the notifier. This way users can supply their own notification mechanisms.
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/06
+HIGHER-LEVEL CLASSIFICATION OF GUI BEHAVIOUR
+Several possibly overlapping classifications of elements:
+- can change part of object (ie: a field) - should we make a distinction?
+- Composite - manages changers (dbEditHelper)
+- can change current selection (dbBrowseHelper)
+
+Should we move to a mixin architecture that provides abstract behaviour?
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+GENERIC UNDO IN OOFILE
+97/09/18
+
+// Implementing a generic Undo would be the icing on the cake.
+
+>Pretty nice icing. <grin>
+
+Well, I'm not sure it's outside the bounds of possibility.
+
+Undo is about metadata - you have to know a lot about your data, the dependencies etc.
+
+The OOFILE GUI integration classes have most of this data already, to implement things like NextRecord buttons (with user prompts to enter unique keys etc.).
+
+As an object-oriented database (or maybe object-relational) we already have all the relationship info we need, and we have a basic RevertRecord functionality built in. 
+
+Maybe for a full Undo stack we need to cache deleted records, and then there's the issue of data that's not in the database. I suspect the area that will need the most work is in making it easier for the user to extend the database model to include some temporary local data.
+
+OOFILE allows you to have multiple databases open at once, some of which may be RAM-based. If any temporary data was stored in a RAM-based database, and we allow relationships to be added between objects in the primary database and the temp one, then I think that would provide a complete data model including temp data.
+
+I am continually surprised at some of the things people have done with calculated fields - one of the cutest was having 5 different relationships in an M:N relationship (the join file fanned out 5 ways) and using a calculated field to mask this fact, with a single field showing the related value.
+
+I'll have to hit the literature some time later this century <G> well, maybe early '98, and seriously consider this issue. The above soliloquy makes it sound too easy. I'm certain multi-user considerations will stuff some things up. 
+
+KIDMAP's distributed, connect by floppy-copy, architecture is a constant reminder of complex multi-user or synchronisation issues. We were recently discussing the propagation of deleted records - what happens when user A creates a record then deletes it on their local machine. 
+
+If they delete it before exporting then the record can just be deleted. If the record has "escaped" to the wider community then a "deleted record" needs to be created so the next export will chase it down and kill it. Then you get into slightly circular arguments - what happens when user B imports the new record, and chooses to delete it themselves (there are two "deleted records" potentially able to be imported). Then user C goes and creates the same record, AFTER the other two have decided they should delete theirs.
+
+If you work on the assumption that within the granularity of user actions, clocks are synchronized, the above can all be handled. If the distributed machines are never mutually connected then synchronization is impossible and all you can do is
+A) live in hope,
+
+B) put some "error bound" checks in place (ie: assume a floppy-based export is consumed within a week, so you can timestamp the export and at least know if the original is in front of or more than a week behind the receiver), and
+
+C) confidently expect your impossible situations are so implausible that the user will blame themselves anyway if they ever occur.
+
+It just struck me - something VERY cool would be a Huh? button on the "Do you want to Save" button, that would bring up a list of the changes about to be saved.
+
+Hmm, OOFILE's change propagation mechanism in the GUI actually knows enough to be able to record this data - do you reckon it would be a worthwhile option in the library?
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/24
+INTERFACING POPUP MENUS, RADIO GROUPS ETC. AND FUTURE ABSTRACTION
+
+The current mess is highly annoying, with dbEditHelper::linkField methods added for each pair of dbField/someGUIeditor classes and a dbLinkField subclass created for the pair.
+
+In the course of thinking about how to interface popup menus, I think there's scope for an dbSelector class which provides an abstract interface to anything that can select from a range of values.
+
+It should be capable of returning either strings or a value, and take a list of strings. Concrete classes would provide oofSelector implementations for popup menus, radio groups and possible scrolling lists in the different GUI's.
+
+Considering this abstraction brings me to the ideal of another abstraction, a dbEntry which hides editing interfaces of various kinds.
+
+Either this, or dbFieldLink can be generalized to store a dbField* only and usually use the setString interface to allow the field to do its own parsing. This would allow us to remove most of the dbFieldLink subclasses and clean up this hierarchy. It also makes it trivial for future framework interfaces or user extensions.
+
+
+98/11/30
+FURTHER THOUGHTS ON ENTRY ABSTRACTION
+When looking at the current dbFieldLink subclasses and the way in which they are going to further proliferate, it struck me that there are only a limited number of ways in which they are copied.
+
+There is no need for all the subclasses if the copying to and from edit or static text fields can be abstracted, but I want to avoid the cost of a subclassed object for just one side of the copy.
+
+Given that dbFieldLink maintains an LPane* for the Link, what we need is to abstract the strategy for copying to a subclass of LPane*, without necessarily creating a concrete class in each case. (I recently read about this pattern, combination of Bridge with Strategy and Flyweight.)
+
+A dbGenericFieldLink class could maintain a pointer to the Copier object which would would be one of several Singleton instantiations, or possibly just using pointers to static methods of dbGenericFieldLink as there is no need to have a full object.
+
+For the field access, setString and copyString can be used which guarantee that format masks are applied to numeric fields.
+
+The main reason why dbEditHelper::linkField might want to have many instances would be to provide compiler checking of the match between fields and GUI controls (eg: not linking character fields to a checkbox, although that might be a nice way to get true;false or credit;debit copied to a field).
+
+Another reason for refining the general case would be to avoid using copyString when there is a more efficient method of copying directly from a large text field to the control. In that case we could subclass dbGenericFieldLink to dbTextFieldLink.
+
+For clients such as Mercator, the dbUshortLink and dbCharLink2EditText classes etc. should be maintained in an obsoletePP file. (Mercator use these classes directly in a few cases.) The concrete classes are currently used so people can create them, hanging onto a pointer, and call copyFieldToLink later. 
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/02
+EDITABLE BROWSERS
+Considering the PowerPlant OutlineItems rewrite for more generic trees 
+leads me to the issues in making cells editable.
+
+Looking briefly at both the PP and Win32 models for editable items, we have
+notification for StartEditing and EndEditing.
+
+Can we use dbFieldLinks to manage this?
+
+Suggested model - a dbEditHelper must exist, and a dbFieldLink is used
+to map to the editable browser, with a dbGuiAdapter handling the actual
+connection.
+
+That way we get all the implications of change from the edit handler - 
+the responsibilities for moving off a dirty record etc.
+
+Possible issue - the dbView used in a list must be a separate iterator
+from the edit helper (it iterates all the data when refreshing the visible
+list).
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/12
+ISSUES IN ADAPTING CHECKBOXES & OTHER CONTROLS.
+For connecting dates to controls (eg: dateTime spinners) in future dbAbstractEditHelper::linkAdapter
+needs to create a different kind of link, that will use get and setValue. Maybe adapters can
+have a preferValues() method to indicate use the value, which we use to decide.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/10/14
+MESSAGES ON LEAVING RECORDS 
+
+There is an assumption of performing actions in the leaving of records which would not work well if there was something after the edit helper which cancelled leaving. The only reason things work so well at present is that only a single edit helper does the work. The single edit helper at present unloads the current record for one case, and leaves record manipulation to others for other cases.
+
+
+If we regard this as a genuine two-phase behaviour, the dbGUI coordinates all the action. We have a distinct breakup:
+1) Can We Leave
+- returns set of conditions to satisfy?
+
+2) Leaving (message before and after).
+- satisfy conditions to leave
+
+If we don't break up the enquiry then we have to ask the user up front if they want to save a dirty record, before we
+
+
+TO CHECK
+Do we have an assumption of one dbGUI per screen or one edithelper per screen, or multiple of both?
+
+Someone must be the sole coordinating object.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/21
+NESTED TRANSACTIONS AND OPERATIONS
+It should be safe to call gotoCurrentOrNewRecord repeatedly with nested
+windows. We need a robust diagram of the state transitions here.
+
+ 
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/04
+ENTERING RELATED DATA
+Entry to related tables can be divided into:
+1) selection of a related record, eg: trivially a lookup value, or
+2) entry of related data into an owned or associated related record.
+
+
+ENTRY VIA POPUP SELECTION
+
+A common situation in database apps is wanting a pick list where a choice is made from a popup to specify a value, eg: a staff member name, which is described by a database table.
+
+In 4th Dimension applications, this used to be accomplished by selecting a table into an array and maintaining that sorted array.
+
+TRIVIAL CASE - MAP POPUP SELECTION INDEX TO INTEGER JOIN KEY
+OOFILE currently allows for this if you have an integer value used as the join key to the related table - using dbEditHelper::linkField with an LStdPopupMenu on Mac or COOFComboBox on Windows.
+
+Selecting from the menu sets the integer field to the ordinal number of the menu item chosen, as if that integer had been typed into an edit box.
+
+However, this doesn't automatically load the contents of the menu from a set of related choices nor does it work for pointer relationships. It supports the relationship utterly by accident.
+
+We must also cater for maintenance over time - the removal of old records may leave gaps in the number, so we can't assume a correspondence between this ordinal number and a valid key.
+
+Allowing for separators in the choice list would also break ordinal sequences.
+
+Finally, what value corresponds to no selection?
+
+Mac menus use zero.
+
+It is also awkard to have to populate a menu by hand in the application, without reference to the database.
+
+To summarise the issues, we have to deal with:
+1) populating the list on the menu
+2) acting on menu selection to set a value in a field (mapped integer or literal title), or
+3) acting on menu selection to change a relationship to point to a different record
+4) continuing to make this as easy to set as the linkField approach.
+
+
+ABSTRACTION OF POPULATING MENUS - SIMPLE APPLICATION LOGIC
+Both platforms all menus to be initialised from resources so a primitive assumption is that is sufficient, effectively hard-coding the list of choices. This will indeed suffice in many simple situations, eg: choosing Gender, Marital Status.
+
+For that simple hard-coded situation, directly using the existing linkField works. The only thing lacking is some display mechanism to output the integer as the mapped menu item title. That can be deferred for now, assuming the GUI toolkit only ever uses the field linked to a menu.
+
+
+POPULATING MENUS FROM RELATED TABLES
+More flexibly, we want to populate a menu from a lookup table. The sort order will be set by the table or possible dbView passed in so allows for arbitrary sorting.
+
+
+ATTEMPTING SIMPLE APPROACH - IS RELATED FIELD A TARGET OR SELECTOR?
+Given a related field specified as the target of a linkField, there are:
+1) it is genuinely an entry field - we are editing or creating a related record
+   owned by the parent record which is the mMainTable for the main dbEditHelper
+   managing the dialog.
+   
+2) choosing a field value is a lookup, specifying which related record should be
+   linked to our parent table   
+
+3) combining the above - primarily act as lookup but allow creation of a new
+   lookup value if not found (combobox behaviour).
+   
+We want this range of behaviours for most edit controls.
+
+
+LOOKUP ENTRY VIA TEXT ENTRY
+In this case we are entering a lookup value, rather than selecting an ordinal 
+record number. This is unconstrained and has to deal with the user being able
+to enter a value which is not in the desired set.
+
+
+
+
+CODE GENERATION ISSUES & OPPORTUNITIES
+A code generator, or even a runtime, may be aware that a related table is located within some subgroup that has an edit helper on the related table.
+
+eg: a panel for entering Visits within Patients.
+
+In this case, we could set flags to indicate that entry of the related data
+is the default behaviour. The user editing in the GUI screens will be for
+a default case but the generated code will be slightly different, possibly
+passing extra flags or pointers into linkField.
+
+
+MULTIPLE LEVEL RELATIONSHIP LOOKUP
+There's a trap looming if you think always of one-level examples such as
+simple lookups (eg: Account->AccountType->Desc).
+
+In this case, given the field Desc we know that the Account->AccountType
+relationship is actually our concern.
+
+However, imagine a multiple level lookup Patients->Visits->Doctor.
+We don't want ambiguity about how the lookup is resolved.
+
+
+CONTROLLING RELATED DATA CREATION
+If we are selecting from a pick list, the user can't create extra records.
+However, if there is an associated entry box (combobox) or just plain entry field then they can.
+
+We need to be able to constrain this entry.
+DEFER FOR NOW
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/10/07
+PROVIDE DEFAULT PRINTING OF WINDOWS
+
+We want to be able to easily print a default report from a window or
+dialog. Ideally it should provide some reflection of the content of that window.
+(The following discussion uses the term "window" generically including dialogs.)
+
+Ideas:
+1) if standard platform Print command used, ANY dialog or window can trigger report
+
+2) set flag on dbGUI to indicate can print, with optional report specified.
+
+3) use ReportFactory concept, with default just making default view from 
+window's main table. This could be abstract enough that the default GUI still doesn't know about the report-writer by abstracting Print handling in total.
+
+4) AppMaker generates Print command handling if you explicitly attach the command.
+
+FORCES
+F1)
+dbGUI manages all the currently active Helpers for at least one but potentially multiple windows - each calling msgForOOFILE or isOOFILEcommandEnabled. These
+windows are active in the sense that need to refresh background windows may
+cause database interaction.
+
+We will possibly want the flexibility for window content to dictate report format so can't have a single setting per dbGUI. eg: two totally different browsers. Alternatively, this may be regarded as an OOFILE weakness in the dbGUI behaviour and just ignored.
+
+F2)
+Want a simple way for browse windows to print their contents and nothing more.
+So the view of the browser is used for the report.
+
+
+F3)
+If want to print forms, run into application-framework issues that OOFILE knows
+nothing about form layout. Would therefore require some report-building class
+to examine the form and build a matching report. This is a very complex area! 

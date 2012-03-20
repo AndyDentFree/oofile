@@ -1,0 +1,1283 @@
+
+Beta source handed over by Elemir 97/08/01
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/08/12
+MAKE OOFYNC MORE LIKE FUNCTION CALL - CAN USE ANY ANONYMOUS VARIANT
+
+CLASS	oofYNC
+- mDisplayed added
+
+Method	ctor (various)
+		- don't invoke msgbox
+		
+Method	msgbox
+		- set mDisplayed
+		
+Method	dtor
+		- check mDisplayed and display if not already displayed				
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d16 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/11/23
+MERGE ELEMIR'S CODE, COMPILE UNDER CW PRO2 & VC4.1
+
+CLASS	dbGUI
+Method	saveRecord
+		- don't broadcast the current OID
+
+
+CLASS	COOFListBox, COOFListCtrl, COOFTreeCtrl
+Method	onDeleteItem, onInsertItem
+		- removed
+		
+Method	OnKeyDown
+		- call msgForOOFILE rather than onDeleteItem, onInsertItem
+		
+		
+CLASS	dbClickLinkDirtier
+Method	OnMessage		
+		- don't SetFocus on the link we're leaving for message WM_KILLFOCUS
+		
+		
+FILE	OOFILEGUI_MFC.rc
+- comment out Czech CodePage instruction
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/01/04
+MINOR CLEANUPS AS PART OF PP2MFC PRODUCT
+
+FILE	oofmsg.h
+		- check OOF_PP2MFC to avoid defining some PP compatability symbols
+		
+CLASS	dbEditHelper
+Method	warnUser
+		- change param from iostream& to ostream& to compile with CodeWarrior
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/05
+FIXES FOR COMPILATION WITHOUT PRECOMPILED HEADERS
+(remove OOF_PP2MFC checks)
+
+FILE 	oofmfcct.h
+- add #include <AFXCMN.H>
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/26
+FIX CRASH WITH HIER BROWSE HELPERS - ENDLESS RECURSION
+
+CLASS	dbHierBrowseHelper
+Method	browseViewWithTreeCtrl(COOFTreeCtrl&)
+		- take address of argument when pass onto browseViewWithTreeCtrl(COOFTreeCtrl*
+		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+97/02/27
+REMOVE dbUshortLink2Popup
+
+removed this class altogether - it is a highly application-specific class and 
+we don't have time to rewrite it to use MFC, so it will be used in KIDMAP relying
+on PP2MFC to make the Mac logic work.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/03
+MERGE ELEMIR'S CHANGES TO UPDATE CALC & FORMATTED FIELDS PLUS OTHER GUI
+CONSISTENCY WITH MAC BEHAVIOUR
+
+CLASS	dbEditHelper
+Method	maybeChangeField
+		- pass false to leaveLink call
+		
+		
+CLASS	COOFEdit, COOFCheckbox
+- added map for ON_WM_SETFOCUS		
+
+CLASS	COOFTreeCtrl
+- added map for ON_MESSAGE(WM_OOFILE_ACCEPTDROP)
+
+Method	OnKeyDown
+		- just beep if get delete/insert, don't delete items!
+		
+		
+CLASS	dbDateLink, dbDateTimeLink
+Method	updateDerivedFieldDisplay
+		- implement body - was commented out
+		
+		
+CLASS	dbClickLinkDirtier
+- made COOFCheckBox a friend				
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/03
+SUPPORT PEOPLE USING OOFILE COMMANDS ON BUTTONS IN THEIR RESOURCES
+
+FILE	oofcmds.h
+- moved command definitions out here from oofmfc.h
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/05
+16-BIT MESSAGING
+
+CLASS	dbEditHelper
+Method	legalCmdMsg
+		- added to check range 0x8000 to 0xdfff
+		
+Method	msgXXXX(UINT)
+		- added ASSERT(legalCmdMsg) to all setters
+		
+Method	SendFrameworkMessage
+		- drop the wParam parameter
+		- use WM_COMMAND as message
+		- pass msg param in wParam		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/06
+FIXES TO DRAG AND DROP
+
+CLASS	COOFListCtrl
+Method	ctor
+		- init mDropID(0), mNumID(0)
+		- set mHighlight to default to HIGHLIGHT_ROW, not single cell
+		
+Method	acceptDrop(numID, array)
+		- handle case of single ID==0 as no ID, leaving mNumID==0		
+
+
+
+CLASS	COOFTreeCtrl, COOFListBox
+Method	ctor
+		- init mDropID(0), mNumID(0)
+		
+Method	acceptDrop(numID, array)
+		- handle case of single ID==0 as no ID, leaving mNumID==0		
+
+
+
+CLASS	COOFOleDropTarget
+Method	OnDrop
+		- pass pWnd in as the LPARAM otherwise we get parsed and end up in ObeyCommand via LWindow::OnCommand Rediretor
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/06
+FIX CLICK AND SINGLE-CLICKS ON LISTS
+
+CLASS	dbEditHelper
+Method	SendFrameworkMessage
+		- renamed sendFrameworkMessage
+		- made static
+
+
+CLASS	COOFListCtrl, COOFTreeCtrl, COOFListBox
+Method	OnOOFileChangeSel, OnDblClk
+		- use dbEditHelper::sendFrameworkMessage		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/07
+MERGING ELEMIR'S LATEST...
+DEFAULT TO WHOLE-ROW HIGHLIGHTING ON LISTS
+GUI BEHAVIOURAL FIXES
+
+CLASS	dbBrowseHelper
+Method	CheckControlStyle
+		- call setHighlightType
+
+
+CLASS	dbEditHelper
+Method	sendFrameworkMessage
+		- check SendMessage return value & return if it's 0, don't directly return it
+		
+		
+CLASS	dbListBoxDisplay
+Method	displayUsesControl
+		- now compare GetSafeHwnd result to inControl (changed what we were passing)
+		
+		
+CLASS	dbListCtrlDisplay
+Method	highlightRow
+		- removed the VERIFY wrappers - it works but sometimes the SetItemState's return nil
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/09
+PREVENT STUPID VC4.1 WARNINGS
+(worked out need to disable warnings after all Windows #includes)
+
+add #pragmas after windows and afx includes in
+- oofync.h
+- stdafx.h
+- oofmfcct.h
+- oofmfcpd.h
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/09
+DEFAULT TO NO ICONS ON TREES
+
+CLASS	COOFTreeCtrl
+Method	SetDefaultImageList
+		- just use NULL, TVSIL_NORMAL
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/10
+MERGE ELEMIR'S FIXES TO DRAGGING FROM TREES
+
+CLASS	COOFTreeCtrl
+- added methods
+	- highlightedIndentLevel
+	- GetFirstSelectedItem
+	- GetNextItem
+	- getFirstSelectedItem
+	- getNextSelectedItem
+	- GetNextItem
+	- GetItemOID
+	- highlightedOID
+
+Method	GetIndentLevel
+		- made const
+
+Method	OnGetDispInfo, OnItemExpanding
+		- use GetItemOID not GetItemData
+		
+		
+CLASS	dbViewOutlineItem
+- added
+
+
+CLASS	dbHierBrowseHelper
+Method	highlightedOID
+		- return highlightedOID from display		
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/15
+MERGE ELEMIR'S FIXES TO DOUBLE-CLICKING DRAG SOURCES
+
+CLASS	COOFLISTCTRL
+- Message map handlers
+  - remove ON_WM_LBUTTONDOWN
+  - add ON_NOTIFY_REFLECT(LVN_BEGINDRAG
+  
+
+CLASS	dbItemCache
+Method	getCachedContents
+		- don't return null, return empty string if no result
+		
+Method	getStringFromView, synchronizeCachedContents, getStringFromView
+		- use copyString instead of asChars 		
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/16
+MERGE ELEMIR'S FIXES
+
+CLASS	dbHelper
+Method	maybeChangeField(CWnd*
+		- added empty base method
+		
+
+CLASS	dbEditHelper
+Method	maybeChangeField(CWnd*
+		- added to get the link and call for link
+		
+
+CLASS	dbFieldLink
+Method	maybeChangeField(CWnd*		
+		- added to call new dbEditHelper variant
+		
+		
+CLASS	dbListBoxDisplay, dbListCtrlDisplay
+Method	displayUsesControl
+		- drop using GetSafeHwnd and just changed back to straight compare
+		
+		
+CLASS	COOFEdit, COOFCheckBox
+- ON_WM_SETFOCUS map removed
+		
+Method	OnKillFocus
+		- call maybeChangeField to possibly notify on the way out
+
+
+CLASS	COOFTreeCtrl
+- now descend from CTreeCtrlEx
+- ON_NOTIFY_REFLECT map for TVN_BEGINDRAG replaces ON_WM_LBUTTONDOWN
+
+Method	highlightNothing				
+		- removed
+
+Method	adjustNumItems
+		- added empty method
+
+Method	highlightedRecNo
+		- calls GetFirstSelectedItem
+
+Method	getItemDesc
+		- added
+
+Method	LoadRow, OnGetDispInfo
+		- use copyString
+
+
+CLASS	dbViewOutlineItem
+Method	nullItem
+		- added		
+		
+
+FILES	TreeCtrlEx.cpp & .h
+- added Public Domain source
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/18
+ALLOW MULTIPLE DROP RECIPIENTS
+
+CLASS	COOFListCtrl, COOFListBox, COOFTreeCtrl
+Method	acceptDrop
+		- (identical, needs merging!!!) 
+		- check mNumID to see if called more than once, to avoid multiple registrations
+		  and copy previous ID's
+		  		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/20
+MERGE ELEMIR'S LATEST
+
+COOFListCtrl::selItemRange
+- use LVIS_SELECTED mask, not 0
+
+
+COOFTreeCtrl::isLeafNode
+- added
+
+Method	OnSelChanged, OnDblClk
+		- use isLeafNode as additional test
+		
+		
+CTreeCtrlEx::OnLButtonDown
+- comment out editing		
+	  and copy previous ID's
+		  		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/22
+AVOID SENDMESSAGE
+
+CLASS	dbEditHelper
+Method	sendFrameworkMessage
+		- rename to postFrameworkMessage
+		- change to use PostMessage to avoid crashes from triggering dialog changes
+		- return bool, not LRESULT
+
+Method	sendImmediateFrameworkMessage
+		- added to provide way to send immediate messages
+		
+Method	CanSaveRecord, ConfirmSave
+		- use sendImmediateFrameworkMessage
+		  		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/03/27
+ADD SUPPORT ROUTINES FROM MAC
+
+CLASS	dbHierBrowseHelper
+Method	deleteAllLevels
+		  		 
+		  		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/02
+ADD COMMAND TEST
+
+CLASS	dbGUI
+Method	isOOFILEmsg
+		- added so external code can know if command is going to be used by msgForOOFILE
+		  (PP2MFC varies behaviour in this case)
+		  		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/06,17
+FIX BUGS IN adoptView - REFRESH CONTENTS LIKE MAC
+
+CLASS	COOFListCtrl, COOFListBox
+Method	changeViewTo
+		- add call to redraw
+		
+
+CLASS	dbListCtrlDisplay, dbListBoxDisplay	
+Method	changeViewTo
+		- move call to mDisplay->changeViewTo before SetColWidths
+		  		 
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/19
+FIX BUGS IN MFC MESSAGING (SHOWN AS FAILURE TO LeaveRecord)
+
+CLASS	dbEditHelper
+Method	postFrameworkMessage, sendImmediateFrameworkMessage
+		- if there's no active CWnd from GetFocus, use the main window 
+		  because in the callback messages to the user, eg: from 
+		  dbEditHelper::LeaveRecord, there may not be an active Wnd		  		 
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/20
+ADJUST COLUMN WIDTHS AUTOMATICALLY ON LOADING
+
+CLASS	dbBrowserHelper
+Method	browseViewWithListCtrl
+		- get the client rect of the table and divide up its column widths.
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/20
+SHOW MESSAGE BOX IN FRONT REGARDLESS OF CURRENT WINDOW TYPE
+
+CLASS	oofYNC
+Method	msgBox
+		- pass NULL as window handle, and OR in MB_TASKMODAL as style flag 
+		  indicating modality
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/21
+FIX RESETTING VIEW LEVELS IN HIERARCHICAL BROWSER
+CLASS	dbHierBrowseHelper
+Method	deleteAllLevels
+		- include assign mHierLevels = 0;
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/21
+FIX EDIT CONTROL ENTRY LENGTHS		
+
+CLASS	dbCharLink2EditField
+Method	ctor
+		- call SetLimitText
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/23
+FIX BUG WHERE TREE CONTROLS CHANGE GLOBAL SEL
+CLASS	COOFTreeCtrl
+Method	InsertSubItems
+		- use stSavedSelection on nestedTable to preserve its selection
+		  whilst we change the set of items to just the subitems
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/23
+FIX BUGS WITH READ-ONLY 		  
+
+CLASS	dbFieldLink
+Method	PreApprovedReadOnly
+		- call CEdit::SetReadOnly for appropriate controls
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/23
+MAKE PANES READ-ONLY RATHER THAN DISABLING		  
+
+pass false in for the disableReadOnlyPanes flag and true for the
+readOnly flag from ctors
+- dbCharLink2Caption
+- dbBoolLink2Caption
+- dbDateLink2Caption
+- dbDateTimeLink2Caption
+- dbLongLink2Caption
+- dbShortLink2Caption
+- dbTextLink2Caption
+- dbUlongLink2Caption
+- dbUshortLink2Caption
+
+forward the disableReadOnlyPanes param to dbFieldLink from ctors
+- dbBoolLink
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/24
+FIX REFRESH ISSUES WITH HIER BROWSERS
+
+CLASS	dbHierBrowser
+Method	ctor
+		- pass 0 up to the abstract browser, NOT the table
+		
+CLASS	dbAbstractBrowseHelper
+Method	ctor
+		- check for param being 0 and pass 0 up the chain, don't assume
+		  it's a valid dbView*		
+		  
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/27
+STILL SEND SINGLE CLICK MESSAGE WHEN CLICK TREE FOLDERS
+
+CLASS	COOFTreeCtrl
+Method	OnSelChanged		  
+		- don't check isLeafNode when deciding to send message
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/29
+SHOW MULTIPLE COLUMNS IN TREE CONTROLS
+
+CLASS	COOFTreeCtrl
+Method	OnGetDispInfo
+		- concatenate all fields in view, with 4 space separators
+		 (being unable to use tab stops)
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/29,30
+PROVIDE FIND-BY-TYPING ON LISTS, TREES, WITH THE SAME TIMEOUT
+AS USED IN THE MAC LIST AND TREE CLASSES WE WROTE
+
+CLASS	COOFListCtrl, COOFListBox, COOFTreeCtrl
+- added MESSAGE MAP entry for ON_WM_TIMER()
+- made subclasses of mixin OOF_NavigableTable
+
+Method	ctor
+		- pass this up to OOF_NavigableTable
+		
+Method	OnTimer
+		- added to react to timer by doing search and change selection
+		
+Method	OnKeyDown		
+		- don't send del/new messages in reaction to Insert/Delete keys
+		- call OOF_NavigableTable::AddChar
+		- only call parent method if we don't handle the char
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/04/30
+SHOW MULTIPLE COLUMNS IN TREE CONTROLS
+
+CLASS	COOFTreeCtrl
+Method	OnGetDispInfo
+		- concatenate all fields in view, with 2 space separators
+		 after padding to width of field
+		
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/11
+COPING WITH WINDOWS COMBO BOX STYLES
+
+CLASS	dbFieldLink
+Method	createDirtySensor(COOFCombo
+		- for setting readOnly initial state, check to see if we got a pointer 
+		  to the embedded edit control and if not, just disable the CWnd
+		- if has no embedded edit control, don't call AddAttachment with
+		  a dbEditLinkDirtier
+		  
+		  
+CLASS	COOFComboBox
+- mLinkDirtier added
+
+Method	OnSelChange
+		- call dbComboLinkDirtier::OnSelChange		  
+
+Method	AddAttachment
+		- change param to type dbComboLinkDirtier		
+		- just store param as mLinkDirtier, don't attach to sub editor
+
+CLASS	dbComboLinkDirtier		
+- added
+
+
+FILE	oofmfcct.h
+- added forward declare of dbComboLinkDirtier
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/05/14
+MERGE ELEMIR'S CHANGES FOR LISTS SUPPRESSING WINDOWS SINGLE CHAR REACTION
+
+CLASS	COOFListCtrl
+- mCharProcessing added
+
+Message	ON_WM_CHAR, ON_WM_KEYUP, ON_NOTIFY_REFLECT(LVN_ITEMCHANGING)
+		- added maps
+		
+Method	OnChar, OnKeyUp, OnItemChanging
+		- added		
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
+98/06/05
+PREVENT MFC PROBLEMS IF ALERT TOO EARLY IN SCREEN CREATION
+
+dbGUI::changedSelection
+		- post a message to trigger the locked notification, rather than inline oofYNC
+		
+Method	msgForOOFILE
+		- react to cmd_dbLockedOnEntry		
+		
+		
+FILE	oofcmds.h
+- added #define cmd_dbLockedOnEntry		
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/23
+
+FIND BY TYPING FEATURE UPDATED
+
+CLASS	COOFListCtrl
+
+OOF_NavigableList::IsTypingChar(nChar) and subsequent addChar(nChar)
+calls moved from OnKeyDown to OnChar message handler. nChar parameter
+passed into OnKeyDown represents a virtual key code, not the actual
+character. The same parameter in OnChar is the real character code
+value.
+
+Default find by typing functionality has been suppressed in OnChar by not
+calling the default CWnd::OnChar handler when a character key is pressed.
+I hope there won't be any problem, because of the missing message
+(::DefWindowProc doesn't get called if the default handler is skipped).
+
+mCharProccessing member variable, OnKeyUp, and OnItemChanging have been
+removed (these were used for sppressing of the default find by typing
+feature).
+
+CLASS	COOFListBox
+
+OOF_NavigableList::IsTypingChar(nChar) moved to OnChar (see COOFListCtrl
+for more detailed description).
+
+EnsureVisible function implemented with the same functionality as in
+CListCtrl.
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/06/30
+DEBUG FIND BY TYPING
+
+CLASS	OOF_NavigableList
+Method	FindOIDforString
+		- if nothing found, return false and 0 oid
+
+
+CLASS	COOFTreeCtrl
+Method	OnTimer
+		- call EnsureVisible instead of SelectItem to scroll rather than highlight
+		  (remove calls to ignoreChangedSelection as part of this)
+		  
+Method	OnChar
+		- added copy of COOFListCtrl method	to suppress control reacting to typing
+		  by immediate scrolling
+		
+
+Method	OnKeyDown
+		- don't call Addchar - that's now in OnChar
+		
+				
+CLASS	COOFListCtrl, COOFListBox
+Method	OnTimer
+		- if didn't find item, make last row visible		
+				
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/07/02
+HANDLE WINDOWS ACCELERATOR KEYS
+
+CLASS	COOFEdit
+Method	OnChar
+		- added to intercept ctrl-character typing as the standard edit
+		  control just beeps
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d18 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/08/09
+MERGE ELEMIR'S 98/07/29 RELEASE
+VC5 COMPATABILITY
+
+CLASS	OOF_NavigableList
+Method	FindRowforString
+
+Type of foundIt local variable changed from 'BOOL' to 'bool' to avoid
+type clash in dbTable::recordNumber when compiling in VC50 environment
+which supports the native boolean type.
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/08/09
+MERGE ELEMIR'S 98/07/29 & 98/07/31 RELEASE
+UPDATE RELATED LISTS WHEN REVERT
+CLASS	dbBrowseHelper
+Method	receiveMsg
+
+The OOFmsg_RevertRecord case added into the 'switch' statement. It calls
+refreshBrowser() and solves the problem when a record is reverted and
+there is a list of related records in the browser.
+
+
+CLASS	dbBrowseHelper
+Method	receiveMsg
+
+refresh() is called on OOFmsg_RevertRecord message.
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/08/09
+MERGE ELEMIR'S 98/07/31 RELEASE
+FIX CRASH IF TRY TO REVERT NEW RECORD
+CLASS	dbGUI
+Method	revertRecord
+
+There is a test for a newly created record in revertRecord before the
+revert operation takes place.
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/08/09
+FIX IF CALL getValue ON NUMERIC FIELD LINKS FOR EMPTY STRINGS
+
+CLASS	dbLongLink
+Method	getValue
+		- added
+		
+CLASS	dbLongLink2EditField
+Method	copyLinkToField, linkEqualsField
+		- use getValue like the other link classes
+
+Check if string is empty rather than calling sscanf, in:
+- dbUlongLink::getValue
+- dbShortLink::getValue
+- dbUshortLink::getValue
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/09/03
+OOF30 - MERGE ELEMIR'S FIXES TO HANDLE NORMAL MFC MODAL OK/CANCEL
+ 
+CLASS	dbGUI
+Method	msgForOOFILE
+		- add case for ID_FILE_CLOSE, ID_APP_EXIT, IDOK and IDCANCEL
+	
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/11/30
+FIX WINDOWS PRECOMPILED HEADER GENERATION
+
+FILE		oofpch_m.h, .cpp created
+
+Add #include "oofpch_m.h" at top of all files in directories:
+- gui/mswin/mfc
+- gui/mswin/mfc/dll
+
+	
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+98/12/23
+OOF41 - KIDMAP CRASHES IF DOUBLE CLICK EMPTY AREA OF LIST (MERGE PARALLEL FIX)
+
+CLASS	COOFListBox
+Method	OnDblClick
+		- check we have a selection before sending the message
+		  
+		  
+CLASS	COOFListCtrl
+Method	OnDblClick
+		- check we have a selection before sending the message
+		  
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/14
+UNIFY BASE GUI CLASSES
+
+GENERAL REPLACE
+OOFMFC_EXT_CLASS renamed to OOFGUI_EXPORT
+to match pattern of OOFILE_EXPORT, OOFREP_EXPORT etc.
+
+
+
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+ADD VERSION DEFINES TO ALL OOFILE PACKAGES
+
+FILE	oofmfc.h
+- add OOFVERS_MFC
+
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/03/18
+FINISH NEW GUI - UNIFY OOFYNC
+
+FILE 	oofync.h
+- combined PPlant and MFC versions
+
+
+FILE	oofync.cpp
+- renamed to oofmfcyn.cpp
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/23
+NEW GUI - USE GUI ADAPTORS IN MFC & COMPILE NEW GUI WITH VC5
+
+
+FILE	oofync.h
+- reverse stupid typdefs of msgTypeT etc.
+
+
+
+CLASS	dbAbstractEditHelper
+Method	SendImmediateFrameworkMessage
+		- added base virtual that calls SendFrameworkMessage
+		
+Method	CanSaveRecord, ConfirmSave
+		- use  SendImmediateFrameworkMessage instead of SendFrameworkMessage
+		
+		
+CLASS	dbGUIAdaptCButton
+- added
+
+
+CLASS	dbHierBrowseHelper
+Method	receiveMsg
+		- restrict to cases for OOFmsg_DeleteRecord & OOFmsg_GetDisplayTableHandler
+		  defaulting to calling parent dbAbstractBrowseHelper
+		  
+Method	highlightRecNo
+		- pass inSelect param to COOFTreeCtrl::highlightRecNo		  
+
+Method	view
+		- added copy from PowerPlant
+
+		  
+CLASS	dbBrowseHelper
+Method	view
+		- made non-inline as is now virtual
+		
+Method	deleteSelection
+		- deleted as implemented in parent
+		
+Method	receiveMsg
+		- restrict to cases for OOFmsg_DeleteRecord & OOFmsg_GetDisplayTableHandler
+		  defaulting to calling parent dbAbstractBrowseHelper
+		  
+Method	browseViewWithTable(LTextTableView* inTable)
+		- removed old copy of Mac method		
+
+
+CLASS	dbEditHelper
+- made subclass of dbAbstractEditHelper
+- removed all member variables
+
+Method	SendFrameworkMessage
+		- added virtual override using postFrameworkMessage
+
+Method	currentGUItarget
+		- added				
+
+- removed methods
+  - adoptLink
+  - receiveMsg
+  - ConfirmSave
+  - EnteringAboutToLoad
+  - EnteringAfterLoad
+  - CanSaveRecord
+  - ChangedCurrentField
+  - maybeDirty
+  - getLink
+  - LeaveRecord
+  - LoadData
+  - warnUser
+  - readOnly
+  - ValidateLinks
+  - copyLinksToFields
+  - ResetDirtyLinks
+  - copyFieldsToLinks
+  - updateDerivedFieldDisplays
+  - table
+  - isDirty
+  - maybeChangeField - both versions
+  - msgCanSaveRecord
+  - msgChangedCurrentField
+  - msgConfirmSave
+  - msgEnteringAboutToLoad
+  - msgEnteringAfterLoad
+  - dtor
+  - linkField(dbBool&, COOFCheckBox*);
+  - linkField(dbBool*, COOFCheckBox*);
+  - linkField(dbBool& fld, COOFCheckBox& ctl) 
+  - linkField(dbBool&, CStatic*);
+  - linkField(dbBool*, CStatic*);
+  - linkField(dbBool& fld, CStatic& ctl) 
+  - linkField(dbChar&, COOFEdit*);
+  - linkField(dbChar*, COOFEdit*);
+  - linkField(dbChar& fld, COOFEdit& ctl) 
+  - linkField(dbChar&, COOFComboBox*);
+  - linkField(dbChar*, COOFComboBox*);
+  - linkField(dbChar& fld, COOFComboBox& ctl) 
+  - linkField(dbChar&, CStatic*);
+  - linkField(dbChar*, CStatic*);
+  - linkField(dbChar& fld, CStatic& ctl) 
+  - linkField(dbText&, COOFEdit*);
+  - linkField(dbText*, COOFEdit*);
+  - linkField(dbText& fld, COOFEdit& ctl) 
+  - linkField(dbText&, CStatic*);
+  - linkField(dbText*, CStatic*);
+  - linkField(dbText& fld, CStatic& ctl) 
+  - linkField(dbLong&, COOFEdit*);
+  - linkField(dbLong*, COOFEdit*);
+  - linkField(dbLong& fld, COOFEdit& ctl) 
+  - linkField(dbLong&, COOFComboBox*);
+  - linkField(dbLong*, COOFComboBox*);
+  - linkField(dbLong& fld, COOFComboBox& ctl) 
+  - linkField(dbLong*, CStatic*);
+  - linkField(dbLong& fld, CStatic& ctl) 
+  - linkField(dbLong&, CStatic*);
+  - linkField(dbUlong&, COOFEdit*);
+  - linkField(dbUlong*, COOFEdit*);
+  - linkField(dbUlong& fld, COOFEdit& ctl) 
+  - linkField(dbUlong&, COOFComboBox*);
+  - linkField(dbUlong*, COOFComboBox*);
+  - linkField(dbUlong& fld, COOFComboBox& ctl) 
+  - linkField(dbUlong&, CStatic*);
+  - linkField(dbUlong*, CStatic*);
+  - linkField(dbUlong& fld, CStatic& ctl) 
+  - linkField(dbShort&, COOFEdit*);
+  - linkField(dbShort*, COOFEdit*);
+  - linkField(dbShort& fld, COOFEdit& ctl) 
+  - linkField(dbShort&, COOFComboBox*);
+  - linkField(dbShort*, COOFComboBox*);
+  - linkField(dbShort& fld, COOFComboBox& ctl) 
+  - linkField(dbShort&, CStatic*);
+  - linkField(dbShort*, CStatic*);
+  - linkField(dbShort& fld, CStatic& ctl) 
+  - linkField(dbUshort&, COOFEdit*);
+  - linkField(dbUshort*, COOFEdit*);
+  - linkField(dbUshort& fld, COOFEdit& ctl) 
+  - linkField(dbUshort&, COOFComboBox*);
+  - linkField(dbUshort*, COOFComboBox*);
+  - linkField(dbUshort& fld, COOFComboBox& ctl) 
+  - linkField(dbUshort&, CStatic*);
+  - linkField(dbUshort*, CStatic*);
+  - linkField(dbUshort& fld, CStatic& ctl) 
+  - linkField(dbDate&, COOFEdit*);
+  - linkField(dbDate*, COOFEdit*);
+  - linkField(dbDate& fld, COOFEdit& ctl) 
+  - linkField(dbDate&, COOFComboBox*);
+  - linkField(dbDate*, COOFComboBox*);
+  - linkField(dbDate& fld, COOFComboBox& ctl) 
+  - linkField(dbDate&, CStatic*);
+  - linkField(dbDate*, CStatic*);
+  - linkField(dbDate& fld, CStatic& ctl) 
+  - linkField(dbDateTime&, COOFEdit*);
+  - linkField(dbDateTime*, COOFEdit*);
+  - linkField(dbDateTime& fld, COOFEdit& ctl) 
+  - linkField(dbDateTime&, COOFComboBox*);
+  - linkField(dbDateTime*, COOFComboBox*);
+  - linkField(dbDateTime& fld, COOFComboBox& ctl) 
+  - linkField(dbDateTime&, CStatic*);
+  - linkField(dbDateTime*, CStatic*);
+  - linkField(dbDateTime& fld, CStatic& ctl) 
+
+
+
+REMOVED CLASSES
+- dbFieldLink (use the one in oofgui.h)
+- dbGUI (use the one in oofgui.h)
+- dbHelper (use the one in oofgui.h)
+- dbAbstractBrowseHelper (use the one in oofgui.h)
+- dbCharLink
+- dbCharLink2EditField
+- dbTextLink
+- dbTextLink2EditField
+- dbTextLink2Caption
+- dbBoolLink
+- dbBoolLink2Checkbox
+- dbBoolLink2Caption
+- dbLongLink
+- dbLongLink2EditField
+- dbLongLink2Caption
+- dbUlongLink
+- dbUlongLink2EditField
+- dbUlongLink2Caption
+- dbShortLink
+- dbShortLink2EditField
+- dbShortLink2Caption
+- dbUshortLink
+- dbUshortLink2EditField
+- dbUshortLink2Caption
+- dbDateTimeLink
+- dbDateTimeLink2EditField
+- dbDateTimeLink2Caption
+- dbDateLink
+- dbDateLink2EditField
+- dbDateLink2Caption
+- dbLinkDirtier
+- dbClickLinkDirtier
+- dbEditLinkDirtier
+- dbComboLinkDirtier
+- dbTableDisplay (use the one in oofgui.h)
+- dbTableViewDisplay (old unimplemented copy of Mac class)
+
+
+ADDED THIN COMPATABILITY CLASSES
+- dbUShortLink
+- dbRealLink2EditField
+- dbCharLink2EditField with ctors for COOFEdit & COOFComboBox
+- dbShortLink2EditField
+- dbCharLink2TextEdit
+- dbTextLink2TextEdit
+
+
+CLASS	COOFEdit, COOFCheckBox
+- made subclass of OOF_mixEditAttachment
+- mLinkDirtier removed
+
+Method	ctor
+		- removed
+		
+Method	dtor
+		- removed
+		
+Method	AddAttachment
+		- removed (in parent mixin)		
+		
+Method	WindowProc
+		- call OOF_mixEditAttachment::AttachedOnMessage
+		
+Method	OnKillFocus		
+		- call OOF_mixEditAttachment::AttachedOnKillFocus
+
+
+CLASS	COOFComboBox
+- made subclass of OOF_mixEditAttachment
+- mLinkDirtier removed
+
+Method	ctor
+		- removed
+		
+Method	dtor
+		- removed
+		
+Method	AddAttachment
+		- removed (in parent mixin)		
+		
+Method	WindowProc
+		- call OOF_mixEditAttachment::AttachedOnMessage
+		
+Method	OnKillFocus		
+		- call OOF_mixEditAttachment::AttachedOnKillFocus
+
+Method	OnSelChange
+		- call OOF_mixEditAttachment::AttachedOnMessage with CBN_SELCHANGE
+		
+
+CLASS	COOFComboBox::COOFSubEdit
+Method	ctor
+		- removed
+
+
+PROJ	OOFMFCLib
+- removed oofync.cpp
+- added oofmfcyn.cpp
+- added oofgui.cpp
+- added path \oofile\source\gui to all targets
+- enabled RTTI
+
+
+FUNC	operator<<(ostream&, PPMessage)
+- just output the raw message (had Mac body commented out so no output)
+		
+		
+CLASS	oofYNC
+Method	initValues
+		- removed
+		
+Method	msgBox
+		- change return type from int to retTypeT
+		
+Method	ctor(all)
+		- add init list like PPlant
+								
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/25
+MAKE HIERARCHICAL TABLES SUBSCRIBE TO GUI
+
+CLASS	dbHierBrowseHelper
+Method	appendLevel
+		- call subscribeTo the GUI of the first level's view
+		
+
+CLASS	dbBrowseHelper
+Method	ctor
+		- pass the view's table up to dbAbstractBrowseHelper
+		  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/04/28
+CLEANUP PRAGMAS AND VC5 COMPILE
+
+change check of MSC_VER to >=1010 so includes VC5 and
+add disable of warning 4800 (bool conversion performance warning) in:
+- oofmfcct.cpp
+- oofmfcct.h
+- oofmfcpd.h
+ 
+		  
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/03-10
+DEBUG NEW GUI
+
+CLASS	OOF_mixEditAttachment
+Method	AttachedOnMessage
+		AttachedOnKillFocus
+		- replace ASSERT(mAdapter) with an if() as some messages received
+		  before initialisation complete
+		  
+		  
+CLASS	dbEditHelper
+Method	getLink(CWnd*)
+		- added inline to avoid other new getLink hiding parent
+		
+Method	getLink(CWndRedir*)
+		- added to restore old functionality (used by PP2MFC)
+
+
+CLASS	dbGUIAdaptCWnd
+Method	setFieldLink
+		- change assertion that must be an Attachable CWnd to if()
+		  to avoid user custom class crashing and add assert to check
+		  that else condition is only if link always read only, so 
+		  should assert if not a CStatic or similar UI object
+		- actually set the bloody link!
+				  
+
+CLASS	COOFTreeCtrl
+make methods virtual for user overriding
+- highlightNothing
+- highlightRecNo
+- highlightedRecNo
+				
+
+CLASS	oofYNC
+Method	msgbox
+		- if mType==MB_USERBUTTONS put the hack in which defaults the buttons
+		  and sets the type, same as used to be in the old ctor(...b1, b2, b3)
+		  
+		  
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/16
+PROTECT USE OF RTTI
+
+check OOF_RTTI_ENABLED before use of dynamic_cast in:
+- dbGUIAdaptCWnd::dbGUIAdaptCWnd
+- dbGUIAdaptCEdit::readOnly
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/05/17
+DEBUG NEW GUI - ERRORS LEAVING FIELDS ON WINDOWS
+
+CLASS	dbGuiAdaptCWnd
+Method	OnKillFocus
+		- now use owner() to get dbHelper and lookup field link
+		  for incoming CWnd.
+		- call leaveLink if we don't manage to call maybeChangeField
+		  for a destination link				
+
+
+CLASS	dbGUIAdaptCCombo
+Method	OnMessage
+		- case CBN_SELCHANGE: call maybeDirty, not leaveLink
+		 
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.3b4d20 public release
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+99/09/12
+ADAPTING CHECKBOXES & OTHER CONTROLS.
+
+CLASS	dbGUIAdaptCButton
+Method	getValue
+		- added using GetCheck
+		
+Method	setValue
+		- added using SetCheck
+		
+Method	setString, getString
+		- rewrote in terms of setValue, getValue
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/01/22
+BUILD WITHOUT C-TREE AND DBASE
+
+FILE	oofmfcic.cpp
+- removed #include "oofile.h" as that was annoying if try to build sample reports
+  without commercial ctree or dbase backend folders
+- add #include "oofview.h"
+		
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2000/11/20
+RECONCILE WITH MAC VERSION
+
+CLASS	oofYNC
+Method	msgBox
+		- add playBeep param and code to map to beep depending on type of Icon
+		
+		
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/08/17 
+MAKE 1.4 BUILD ALL MSVC GUI SAMPLES
+
+CLASS	OOF_dbTableStatics
+- add OOFILE_EXPORT qualifier
+
+
+CLASS	oofYNC
+- add OOFGUI_EXPORT qualifier
+
+
+-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+2001/11/26
+MAKE 1.4 BUILD GUI WITH CODEWARRIOR X86 COMPILERS
+
+CLASS	dbItemCache
+Method	getStringFromView
+		getString (all three variants)
+		getCachedContents
+		- return const char* instead of char* as literal strings are now
+		const
+		
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+OOFILE 1.4 PUBLIC RELEASE
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
